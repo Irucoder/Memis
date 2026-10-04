@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Panel de Administración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <style>
+    body { background: #0a121a; }
+    .admin { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
+    .admin header { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
+    .admin h1 { font-family: var(--font-type); font-weight: normal; font-size: 26px; margin: 0; letter-spacing: 0.04em; }
+    .admin header .actions { display: flex; gap: 8px; }
+    .card { background: #0f1b26; border: 1px solid var(--line); border-radius: 4px; padding: 20px; margin-bottom: 18px; }
+    .card h2 { font-family: var(--font-mono); font-size: 13px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); margin: 0 0 14px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .status-line { font-family: var(--font-type); font-size: 17px; margin-bottom: 14px; }
+    .status-line .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; min-width: 0; }
+    .field label, .lbl { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-dim); }
+    .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 16px; }
+    input[type=text], input[type=datetime-local], input[type=number], select, textarea {
+      width: 100%; padding: 9px 10px; background: #08111a; border: 1px solid var(--line); border-radius: 3px; color: var(--text);
+    }
+    textarea { min-height: 140px; resize: vertical; font-family: var(--font-type); line-height: 1.5; }
+    input[type=file] { color: var(--text-dim); max-width: 100%; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid rgba(200, 68, 58, 0.5); outline-offset: 0; }
+    .switch { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.4; }
+    .switch input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); }
+    .help { font-size: 13px; color: var(--text-dim); margin: 6px 0 0; line-height: 1.45; }
+    .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
+    .tabs button { padding: 8px 16px; background: transparent; border: 0; cursor: pointer; color: var(--text-dim); letter-spacing: 0.08em; }
+    .tabs button.active { background: #22303d; color: var(--text); }
+    .radio-row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+    .radio-row label { display: flex; gap: 6px; align-items: center; cursor: pointer; text-transform: none; letter-spacing: 0; font-size: 14px; color: var(--text); }
+    .radio-row input { accent-color: var(--accent); }
+
+    .doc-list { display: flex; flex-direction: column; gap: 10px; }
+    .doc-item { display: grid; grid-template-columns: 72px 1fr; gap: 14px; padding: 12px; background: #0a141e; border: 1px solid var(--line); border-radius: 3px; }
+    .doc-item .thumb { width: 72px; height: 90px; background: var(--paper); display: grid; place-items: center; overflow: hidden; color: var(--ink); font-family: var(--font-type); font-size: 11px; text-align: center; padding: 4px; }
+    .doc-item .thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .doc-item .top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
+    .doc-item .top input[type=text] { flex: 1; min-width: 160px; }
+    .pill { font-size: 11px; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; white-space: nowrap; }
+    .pill.live { background: rgba(80, 180, 110, 0.18); color: #7fd99a; }
+    .pill.sched { background: rgba(241, 230, 74, 0.14); color: var(--highlight); }
+    .doc-item .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 12px; align-items: end; }
+    .doc-item .controls .field { margin: 0; }
+    .doc-item .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .btn.danger { background: transparent; border: 1px solid rgba(200, 68, 58, 0.6); color: #ff9c92; }
+    .empty { color: var(--text-dim); font-family: var(--font-type); padding: 10px 0; }
+    .progress { font-size: 13px; color: var(--text-dim); margin-left: 6px; }
+    .filter-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+  <main class="admin">
+    <header>
+      <h1>Panel de administración</h1>
+      <div class="actions">
+        <a class="btn small dark" href="/tablero">Ver / acomodar tablero</a>
+        <button class="btn small ghost" id="logoutBtn" type="button">Salir</button>
+      </div>
+    </header>
+
+    <section class="card">
+      <h2>Apertura del sitio</h2>
+      <div class="status-line" id="unlockStatus"></div>
+      <div class="row">
+        <div class="field" style="flex:1;min-width:220px;margin:0">
+          <label for="unlockInput">Fecha y hora de apertura</label>
+          <input type="datetime-local" id="unlockInput">
+        </div>
+        <button class="btn small" id="saveUnlock" type="button">Guardar fecha</button>
+        <button class="btn small dark" id="openNow" type="button">Abrir ahora</button>
+        <button class="btn small ghost" id="closeSite" type="button">Cerrar sin fecha</button>
+      </div>
+      <p class="help">Antes de esa fecha, quien entre con la contraseña de jugador ve la cuenta regresiva. "Cerrar sin fecha" deja el sitio bloqueado sin mostrar cuenta regresiva. La contraseña de vista previa saltea siempre el bloqueo.</p>
+    </section>
+
+    <section class="card">
+      <h2>Documentos por venir</h2>
+      <label class="switch">
+        <input type="checkbox" id="showPending">
+        <span>Mostrar en el tablero la silueta con un <strong>?</strong> de los documentos programados que todavía no aparecieron.<br>
+        <span class="help">Si está desactivado, los documentos programados no se ven hasta su hora. Cada documento puede cambiar esto individualmente.</span></span>
+      </label>
+    </section>
+
+    <section class="card">
+      <h2>Cargar documento</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" class="active" data-kind="file">Archivo (imagen / PDF)</button>
+        <button type="button" data-kind="text">Texto escrito</button>
+      </div>
+      <form id="uploadForm">
+        <div class="grid2">
+          <div class="field">
+            <label for="fTitle">Título</label>
+            <input type="text" id="fTitle" placeholder="Ej: Informe forense">
+          </div>
+          <div class="field">
+            <label for="fCaption">Epígrafe (opcional)</label>
+            <input type="text" id="fCaption" placeholder="Texto que aparece al pie o al ampliarlo">
+          </div>
+        </div>
+        <div class="field" id="fileField">
+          <label for="fFile">Archivo(s)</label>
+          <input type="file" id="fFile" multiple accept="image/*,application/pdf,.pdf,.txt">
+          <p class="help">Podés elegir varios a la vez; se cargan todos con la misma configuración. Si dejás el título vacío se usa el nombre del archivo.</p>
+        </div>
+        <div class="field hidden" id="textField">
+          <label for="fText">Texto</label>
+          <textarea id="fText" placeholder="Escribí el contenido del documento…"></textarea>
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label for="fStyle">Estilo en el tablero</label>
+            <select id="fStyle">
+              <option value="auto">Automático</option>
+              <option value="papel">Hoja de papel (con cinta)</option>
+              <option value="polaroid">Polaroid</option>
+              <option value="foto">Foto con chinche</option>
+              <option value="recorte">Recorte de diario</option>
+              <option value="nota">Nota adhesiva</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="fPreview">Antes de aparecer</label>
+            <select id="fPreview">
+              <option value="default">Según configuración general</option>
+              <option value="show">Mostrar silueta con ?</option>
+              <option value="hide">No mostrar nada</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <span class="lbl">Aparición</span>
+          <div class="radio-row">
+            <label><input type="radio" name="when" value="now" checked> Publicar ahora</label>
+            <label><input type="radio" name="when" value="later"> Programar</label>
+            <input type="datetime-local" id="fPublishAt" style="max-width:260px" disabled>
+          </div>
+        </div>
+        <button class="btn" type="submit" id="uploadBtn">Cargar al tablero</button>
+        <span class="progress" id="uploadProgress"></span>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Documentos cargados</h2>
+      <div class="filter-row" id="filters">
+        <button class="btn small dark" data-filter="all" type="button">Todos</button>
+        <button class="btn small ghost" data-filter="live" type="button">Publicados</button>
+        <button class="btn small ghost" data-filter="sched" type="button">Programados</button>
+      </div>
+      <div class="doc-list" id="docList"></div>
+    </section>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

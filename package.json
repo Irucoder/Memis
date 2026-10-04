@@ -1,0 +1,14 @@
+{
+  "name": "memis",
+  "version": "1.0.0",
+  "description": "Tablero de juego de detectives con cuenta regresiva y panel de administración",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

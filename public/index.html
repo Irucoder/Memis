@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Expediente Confidencial</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="room">
+    <div class="lamp" aria-hidden="true"><div class="cord"></div><div class="shade"></div><div class="rim"></div><div class="bulb"></div></div>
+    <div class="wall-papers" aria-hidden="true">
+      <span style="left:3%;top:8%;transform:rotate(-8deg)"></span>
+      <span style="left:1%;top:40%;transform:rotate(5deg)"></span>
+      <span style="left:4%;top:70%;transform:rotate(-4deg)"></span>
+      <span style="right:3%;top:6%;transform:rotate(7deg)"></span>
+      <span style="right:1%;top:38%;transform:rotate(-6deg)"></span>
+      <span style="right:4%;top:68%;transform:rotate(4deg)"></span>
+    </div>
+
+    <section class="center-stage">
+      <form class="case-file" id="login" autocomplete="off">
+        <div class="meta"><span>EXP. N.º 0417-ANA</span><span>ACCESO RESTRINGIDO</span></div>
+        <h1>Expediente confidencial</h1>
+        <p>Este archivo contiene material reservado de la investigación. Ingresá la clave para continuar.</p>
+        <label for="password">CONTRASEÑA</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
+        <button class="btn" type="submit">Abrir expediente</button>
+        <div class="error" id="error" role="alert"></div>
+        <div class="stamp" aria-hidden="true">CLASIFICADO</div>
+      </form>
+    </section>
+    <div class="vignette" aria-hidden="true"></div>
+  </main>
+
+  <script>
+    const form = document.getElementById('login');
+    const input = document.getElementById('password');
+    const errorEl = document.getElementById('error');
+
+    const go = (role) => location.replace(role === 'admin' ? '/admin' : '/tablero');
+
+    fetch('/api/state', { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((s) => { if (s) go(s.role); })
+      .catch(() => {});
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorEl.textContent = '';
+      const btn = form.querySelector('button');
+      btn.disabled = true;
+      try {
+        const r = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: input.value }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Contraseña incorrecta');
+        go(data.role);
+      } catch (err) {
+        errorEl.textContent = err.message;
+        form.classList.remove('shake');
+        void form.offsetWidth;
+        form.classList.add('shake');
+        input.select();
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
