@@ -14,7 +14,7 @@ function getHandler() {
       readDb: () => store.get('db', { type: 'json' }),
       writeDb: (db) => store.setJSON('db', db),
       readSecret: () => store.get('secret', { type: 'text' }),
-      writeSecret: (s) => store.set('secret', s),
+      writeSecret: (s) => store.set('secret', s, { onlyIfNew: true }), // la primera gana
       putFile: (name, bytes, mime) => store.set('files/' + name, bytes, { metadata: { mime } }),
       async getFile(name) {
         const r = await store.getWithMetadata('files/' + name, { type: 'stream' });

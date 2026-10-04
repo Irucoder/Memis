@@ -45,7 +45,7 @@ const handle = createHandler(
       await fsp.rename(DB_FILE + '.tmp', DB_FILE);
     },
     readSecret: () => readOrNull(SECRET_FILE, 'utf8'),
-    writeSecret: (s) => fsp.writeFile(SECRET_FILE, s),
+    writeSecret: (s) => fsp.writeFile(SECRET_FILE, s, { flag: 'wx' }).catch(() => {}), // la primera gana
     putFile: (name, bytes) => fsp.writeFile(path.join(UPLOAD_DIR, safeName(name)), bytes),
     async getFile(name) {
       const body = await readOrNull(path.join(UPLOAD_DIR, safeName(name)));
