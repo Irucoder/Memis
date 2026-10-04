@@ -2,44 +2,143 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Expediente Confidencial</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Club de Memis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@600&display=swap" rel="stylesheet">
+  <link rel="preload" as="image" href="/fondo.webp">
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(ellipse at 50% 50%, #233a2c, #172a1f 75%);
+    }
+
+    /* La imagen cubre la pantalla como "cover"; todo lo que va encima se
+       ubica en porcentajes de la imagen, así la casilla queda siempre en su lugar. */
+    .stage {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100vw, calc(100vh * 1672 / 941));
+      aspect-ratio: 1672 / 941;
+      transform: translate(-50%, -50%);
+      background: url('/fondo.webp') center / 100% 100% no-repeat;
+      container-type: inline-size;
+    }
+    /* Pantallas verticales (celular): se agranda para que la carpeta ocupe el ancho */
+    @media (max-aspect-ratio: 1 / 1) {
+      .stage {
+        width: 250vw;
+        transform: translate(-47.8%, -50%);
+        /* los bordes se funden con el fondo */
+        -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+        mask-image: linear-gradient(180deg, transparent, #000 14%, #000 86%, transparent);
+      }
+    }
+
+    .stage form { margin: 0; }
+
+    .slot {
+      position: absolute;
+      left: 49.22%;
+      top: 60.04%;
+      width: 5.6cqw;
+      height: 2.2cqw;
+      transform: translate(-50%, -50%) rotate(-12deg);
+    }
+    .slot input {
+      width: 100%;
+      height: 100%;
+      box-sizing: border-box;
+      padding: 0.25cqw 0.35cqw 0;
+      border: 0;
+      background: transparent;
+      color: #1f1d1a;
+      font-family: 'Josefin Sans', 'Century Gothic', 'Futura', sans-serif;
+      font-weight: 600;
+      font-size: 1.05cqw;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      text-align: center;
+      outline: none;
+      caret-color: #1f1d1a;
+    }
+    .slot::after { /* aviso sutil de que se puede escribir */
+      content: '';
+      position: absolute;
+      inset: -0.15cqw;
+      border-radius: 0.15cqw;
+      pointer-events: none;
+      box-shadow: 0 0 0 0.12cqw rgba(255, 255, 255, 0);
+      transition: box-shadow 0.2s;
+    }
+    .slot:hover::after { box-shadow: 0 0 0 0.12cqw rgba(255, 255, 255, 0.3); }
+    .slot.shake { animation: shake 0.45s; }
+    @keyframes shake {
+      0%, 100% { transform: translate(-50%, -50%) rotate(-12deg); }
+      20% { transform: translate(-58%, -50%) rotate(-12deg); }
+      40% { transform: translate(-43%, -50%) rotate(-12deg); }
+      60% { transform: translate(-55%, -50%) rotate(-12deg); }
+      80% { transform: translate(-47%, -50%) rotate(-12deg); }
+    }
+
+    /* Sello de "acceso denegado" */
+    .denied {
+      position: absolute;
+      left: 49%;
+      top: 68.5%;
+      padding: 0.2cqw 0.7cqw;
+      border: 0.22cqw solid #c41e24;
+      border-radius: 0.3cqw;
+      color: #c41e24;
+      font-family: 'Josefin Sans', sans-serif;
+      font-weight: 600;
+      font-size: 1.1cqw;
+      letter-spacing: 0.14em;
+      white-space: nowrap;
+      transform: translate(-50%, -50%) rotate(-9deg) scale(1.6);
+      opacity: 0;
+      pointer-events: none;
+      mix-blend-mode: multiply;
+    }
+    .denied.show { animation: stamp 2.4s ease-out forwards; }
+    @keyframes stamp {
+      0% { opacity: 0; transform: translate(-50%, -50%) rotate(-9deg) scale(1.6); }
+      12% { opacity: 0.85; transform: translate(-50%, -50%) rotate(-9deg) scale(1); }
+      75% { opacity: 0.85; }
+      100% { opacity: 0; transform: translate(-50%, -50%) rotate(-9deg) scale(1); }
+    }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip: rect(0 0 0 0); white-space: nowrap;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .slot.shake, .denied.show { animation: none; }
+      .denied.show { opacity: 0.85; }
+    }
+  </style>
 </head>
 <body>
-  <main class="room">
-    <div class="lamp" aria-hidden="true"><div class="cord"></div><div class="shade"></div><div class="rim"></div><div class="bulb"></div></div>
-    <div class="wall-papers" aria-hidden="true">
-      <span style="left:3%;top:8%;transform:rotate(-8deg)"></span>
-      <span style="left:1%;top:40%;transform:rotate(5deg)"></span>
-      <span style="left:4%;top:70%;transform:rotate(-4deg)"></span>
-      <span style="right:3%;top:6%;transform:rotate(7deg)"></span>
-      <span style="right:1%;top:38%;transform:rotate(-6deg)"></span>
-      <span style="right:4%;top:68%;transform:rotate(4deg)"></span>
-    </div>
-
-    <section class="center-stage">
-      <form class="case-file" id="login" autocomplete="off">
-        <div class="meta"><span>EXP. N.º 0417-ANA</span><span>ACCESO RESTRINGIDO</span></div>
-        <h1>Expediente confidencial</h1>
-        <p>Este archivo contiene material reservado de la investigación. Ingresá la clave para continuar.</p>
-        <label for="password">CONTRASEÑA</label>
-        <input id="password" name="password" type="password" autocomplete="current-password" autofocus required>
-        <button class="btn" type="submit">Abrir expediente</button>
-        <div class="error" id="error" role="alert"></div>
-        <div class="stamp" aria-hidden="true">CLASIFICADO</div>
-      </form>
-    </section>
-    <div class="vignette" aria-hidden="true"></div>
+  <main class="stage">
+    <form id="login" autocomplete="off">
+      <div class="slot" id="slot">
+        <label class="sr-only" for="password">Clave secreta</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" autofocus required spellcheck="false">
+      </div>
+      <button class="sr-only" type="submit">Ingresar</button>
+    </form>
+    <div class="denied" id="denied" role="alert">Acceso denegado</div>
   </main>
 
   <script>
     const form = document.getElementById('login');
     const input = document.getElementById('password');
-    const errorEl = document.getElementById('error');
+    const slot = document.getElementById('slot');
+    const denied = document.getElementById('denied');
 
     const go = (role) => location.replace(role === 'admin' ? '/admin' : '/tablero');
 
@@ -48,11 +147,18 @@
       .then((s) => { if (s) go(s.role); })
       .catch(() => {});
 
+    // Cualquier click en la carpeta enfoca la casilla
+    document.addEventListener('mousedown', (e) => {
+      if (e.target === input) return;
+      e.preventDefault(); // que el click no le saque el foco a la casilla
+      input.focus();
+    });
+
+    let busy = false;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      errorEl.textContent = '';
-      const btn = form.querySelector('button');
-      btn.disabled = true;
+      if (busy) return;
+      busy = true;
       try {
         const r = await fetch('/api/login', {
           method: 'POST',
@@ -60,16 +166,18 @@
           body: JSON.stringify({ password: input.value }),
         });
         const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Contraseña incorrecta');
+        if (!r.ok) throw new Error(data.error || 'Acceso denegado');
         go(data.role);
-      } catch (err) {
-        errorEl.textContent = err.message;
-        form.classList.remove('shake');
-        void form.offsetWidth;
-        form.classList.add('shake');
-        input.select();
+      } catch {
+        for (const el of [slot, denied]) {
+          el.classList.remove('shake', 'show');
+          void el.offsetWidth;
+        }
+        slot.classList.add('shake');
+        denied.classList.add('show');
+        input.value = '';
       } finally {
-        btn.disabled = false;
+        busy = false;
       }
     });
   </script>

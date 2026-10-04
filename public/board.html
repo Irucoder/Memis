@@ -49,9 +49,20 @@
     <!-- Tablero -->
     <section class="board-scroll hidden" id="boardView">
       <div class="board" id="board">
-        <div class="board-empty hidden" id="boardEmpty">EL TABLERO ESTÁ VACÍO… POR AHORA.</div>
+        <div class="board-empty hidden" id="boardEmpty"><span>EL TABLERO ESTÁ VACÍO… POR AHORA.</span></div>
+        <svg class="threads" id="threads" aria-hidden="true"></svg>
       </div>
     </section>
+
+    <button class="spool hidden" id="spool" type="button" aria-pressed="false" title="Conectar pistas con hilo">
+      <span class="spool-body" aria-hidden="true">
+        <span class="spool-tail"></span>
+        <span class="spool-disc top"></span>
+        <span class="spool-thread"></span>
+        <span class="spool-disc bottom"></span>
+      </span>
+      <span class="spool-label" id="spoolLabel">Hilo rojo</span>
+    </button>
 
     <div class="vignette" aria-hidden="true"></div>
   </main>
@@ -63,6 +74,8 @@
   </div>
 
   <div class="edit-hint hidden" id="editHint">Arrastrá para mover · Rueda del mouse para rotar · Shift + rueda para cambiar el tamaño</div>
+  <div class="edit-hint hidden" id="threadHint"></div>
+  <div class="thread-menu hidden" id="threadMenu"><button class="btn small" id="cutThread" type="button">✂ Cortar hilo</button></div>
 
   <script src="/board.js"></script>
 </body>

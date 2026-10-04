@@ -62,6 +62,9 @@ function renderSettings() {
   }
   if (document.activeElement !== $('unlockInput')) $('unlockInput').value = toLocalInput(unlockAt);
   $('showPending').checked = !!showPendingDefault;
+  const n = state.threadCount || 0;
+  $('threadStatus').textContent = n === 0 ? 'Todavía no hay hilos.' : n === 1 ? 'Hay 1 hilo en el tablero.' : `Hay ${n} hilos en el tablero.`;
+  $('clearThreads').disabled = n === 0;
 }
 
 async function saveSettings(patch, msg) {
@@ -83,6 +86,16 @@ $('saveUnlock').addEventListener('click', () => {
 $('openNow').addEventListener('click', () => saveSettings({ unlockAt: new Date(now()).toISOString() }, 'Sitio abierto'));
 $('closeSite').addEventListener('click', () => {
   if (confirm('¿Cerrar el sitio para los jugadores sin fecha de apertura?')) saveSettings({ unlockAt: null }, 'Sitio cerrado');
+});
+$('clearThreads').addEventListener('click', async () => {
+  if (!confirm('¿Borrar todos los hilos que conectaron los jugadores? No se puede deshacer.')) return;
+  try {
+    await api('DELETE', '/api/admin/threads');
+    toast('Hilos borrados');
+    await load();
+  } catch (e) {
+    toast(e.message);
+  }
 });
 $('showPending').addEventListener('change', (e) => saveSettings({ showPendingDefault: e.target.checked }, 'Configuración guardada'));
 

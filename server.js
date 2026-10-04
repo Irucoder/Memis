@@ -15,12 +15,24 @@ const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
 const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SECRET_FILE = path.join(DATA_DIR, 'secret');
+const THREADS_FILE = path.join(DATA_DIR, 'threads.json');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const readOrNull = (file, enc) => fsp.readFile(file, enc).catch(() => null);
 const safeName = (name) => path.basename(name);
+
+// Un solo proceso: alcanza con encadenar las escrituras de hilos
+let threadsQueue = Promise.resolve();
+function writeThreads(fn) {
+  const run = threadsQueue.then(async () => {
+    const raw = await readOrNull(THREADS_FILE, 'utf8');
+    await fsp.writeFile(THREADS_FILE, JSON.stringify(fn(raw ? JSON.parse(raw) : []), null, 2));
+  });
+  threadsQueue = run.catch(() => {});
+  return run;
+}
 
 const handle = createHandler(
   {
@@ -40,6 +52,15 @@ const handle = createHandler(
       return body && { body, mime: null };
     },
     deleteFile: (name) => fsp.rm(path.join(UPLOAD_DIR, safeName(name)), { force: true }),
+    async readThreads() {
+      const raw = await readOrNull(THREADS_FILE, 'utf8');
+      return raw ? JSON.parse(raw) : [];
+    },
+    addThread(id, from, to) {
+      return writeThreads((list) => (list.some((t) => t.id === id) ? list : [...list, { id, from, to }]));
+    },
+    deleteThread: (id) => writeThreads((list) => list.filter((t) => t.id !== id)),
+    clearThreads: () => writeThreads(() => []),
   },
   {
     passwords: {
@@ -58,6 +79,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.webp': 'image/webp',
   '.ico': 'image/x-icon',
 };
 

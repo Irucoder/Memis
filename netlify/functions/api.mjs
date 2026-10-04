@@ -21,6 +21,20 @@ function getHandler() {
         return r && { body: r.data, mime: r.metadata && r.metadata.mime };
       },
       deleteFile: (name) => store.delete('files/' + name),
+      async readThreads() {
+        const { blobs } = await store.list({ prefix: 'threads/' });
+        return blobs.map((b) => {
+          const id = b.key.slice('threads/'.length);
+          const [from, to] = id.split('_');
+          return { id, from, to };
+        });
+      },
+      addThread: (id) => store.set('threads/' + id, '1'),
+      deleteThread: (id) => store.delete('threads/' + id),
+      async clearThreads() {
+        const { blobs } = await store.list({ prefix: 'threads/' });
+        await Promise.all(blobs.map((b) => store.delete(b.key)));
+      },
     },
     {
       passwords: {

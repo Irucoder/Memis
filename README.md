@@ -18,6 +18,14 @@ Los documentos y la configuración se guardan en **Netlify Blobs**, el almacenam
 
 **Límite:** cada archivo puede pesar hasta unos **5,8 MB** (límite de Netlify). Las fotos más pesadas se achican solas al subirlas; los PDF grandes hay que comprimirlos antes (por ejemplo con ilovepdf.com).
 
+## Cómo se ve
+
+- **Portada** (`public/fondo.webp`): la carpeta del Club de Memis; la clave se escribe en la etiqueta blanca vacía y se confirma con Enter.
+- **Tablero** (`public/corcho.webp`): un corcho con marco bajo la lámpara, con las pistas clavadas con chinches.
+- **Hilo rojo**: a la derecha hay un carretel. Tocándolo, cada jugador puede unir dos pistas con hilo (tocar una y después la otra). Tocar un hilo permite cortarlo. Los hilos se guardan en el servidor, los ven todos los jugadores y no se borran al cargar nueva evidencia. Desde el panel admin se ve cuántos hay y se pueden borrar todos.
+
+Para cambiar las imágenes, reemplazá esos archivos manteniendo el nombre (si cambia la proporción de la portada, hay que reajustar la posición de la casilla en `public/index.html`).
+
 ## Contraseñas
 
 | Contraseña     | Qué hace                                                                  |

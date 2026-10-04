@@ -10,6 +10,9 @@ let unlockAt = null;
 let firstRender = true;
 let editing = false;
 let dragging = null;
+let threads = [];
+let threading = false;
+let threadFrom = null; // id del documento donde se ató la primera punta
 const rendered = new Map(); // id -> { el, sig, doc }
 
 const now = () => Date.now() + clockOffset;
@@ -43,8 +46,14 @@ async function load() {
   $('editBtn').classList.toggle('hidden', role !== 'admin');
   $('adminLink').classList.toggle('hidden', role !== 'admin');
 
-  if (s.locked) showWait();
-  else showBoard(s.docs);
+  $('spool').classList.toggle('hidden', s.locked);
+  if (s.locked) {
+    setThreading(false);
+    showWait();
+  } else {
+    threads = s.threads || [];
+    showBoard(s.docs);
+  }
 }
 
 setInterval(load, POLL_MS);
@@ -174,9 +183,7 @@ function buildDoc(d) {
   }
 
   el.setAttribute('aria-label', d.title || 'Documento');
-  const deco = document.createElement('span');
-  deco.className = ['papel', 'polaroid'].includes(d.style) ? 'tape' : 'pin';
-  el.appendChild(deco);
+  el.appendChild(Object.assign(document.createElement('span'), { className: 'pin' }));
 
   if (d.kind === 'text') {
     if (d.title) body.appendChild(Object.assign(document.createElement('div'), { className: 'doc-title', textContent: d.title }));
@@ -312,6 +319,7 @@ function docFromEvent(e) {
 $('board').addEventListener('click', (e) => {
   if (editing) return;
   const r = docFromEvent(e);
+  if (threading) return r && pickThreadEnd(r);
   if (!r) return;
   if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
   openLightbox(r.doc);
@@ -322,6 +330,7 @@ $('board').addEventListener('keydown', (e) => {
   const r = docFromEvent(e);
   if (!r || editing) return;
   e.preventDefault();
+  if (threading) return pickThreadEnd(r);
   if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
   openLightbox(r.doc);
 });
@@ -329,6 +338,7 @@ $('board').addEventListener('keydown', (e) => {
 // ---------- Modo acomodar (solo admin) ----------
 
 $('editBtn').addEventListener('click', () => {
+  setThreading(false);
   editing = !editing;
   $('board').classList.toggle('editing', editing);
   $('editBtn').textContent = editing ? 'Listo' : 'Acomodar';
@@ -403,5 +413,166 @@ $('board').addEventListener('wheel', (e) => {
   placeDoc(r.el, r.doc);
   saveLayout(r, {});
 }, { passive: false });
+
+// ---------- Hilo rojo ----------
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+const svg = $('threads');
+let pointer = null; // posición del mouse en coordenadas del tablero
+let lastSig = '';
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+  return el;
+}
+
+// Centro de la chinche de cada documento, en píxeles del tablero
+function pinPoint(id, boardRect) {
+  const r = rendered.get(id);
+  const pin = r && r.el.querySelector('.pin');
+  if (!pin) return null;
+  const p = pin.getBoundingClientRect();
+  return { x: p.left + p.width / 2 - boardRect.left, y: p.top + p.height / 2 - boardRect.top };
+}
+
+function curve(a, b) {
+  const dist = Math.hypot(b.x - a.x, b.y - a.y);
+  const sag = Math.min(60, dist * 0.06); // el hilo cuelga un poco
+  const cx = (a.x + b.x) / 2;
+  const cy = (a.y + b.y) / 2 + sag;
+  return `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+}
+
+function drawThreads() {
+  const board = $('board');
+  if ($('boardView').classList.contains('hidden')) return;
+  const rect = board.getBoundingClientRect();
+  const lines = [];
+  for (const t of threads) {
+    const a = pinPoint(t.from, rect);
+    const b = pinPoint(t.to, rect);
+    if (a && b) lines.push({ id: t.id, d: curve(a, b), a, b });
+  }
+  let draft = null;
+  if (threading && threadFrom && pointer) {
+    const a = pinPoint(threadFrom, rect);
+    if (a) draft = curve(a, pointer);
+  }
+  const sig = rect.width + '|' + lines.map((l) => l.d).join('|') + '|' + draft;
+  if (sig === lastSig) return;
+  lastSig = sig;
+
+  const w = Math.max(1.6, rect.width / 520); // grosor proporcional al tablero
+  svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+  svg.replaceChildren();
+  for (const l of lines) {
+    const g = svgEl('g', { 'data-id': l.id });
+    g.appendChild(svgEl('path', { d: l.d, class: 't-shadow', 'stroke-width': w * 1.4, transform: `translate(${w * 1.2} ${w * 2})` }));
+    g.appendChild(svgEl('path', { d: l.d, class: 't-line', 'stroke-width': w }));
+    g.appendChild(svgEl('path', { d: l.d, class: 't-hi', 'stroke-width': w * 0.35 }));
+    g.appendChild(svgEl('path', { d: l.d, class: 't-hit', 'stroke-width': Math.max(14, w * 6) }));
+    g.appendChild(svgEl('circle', { cx: l.a.x, cy: l.a.y, r: w * 0.9, class: 'knot' }));
+    g.appendChild(svgEl('circle', { cx: l.b.x, cy: l.b.y, r: w * 0.9, class: 'knot' }));
+    svg.appendChild(g);
+  }
+  if (draft) svg.appendChild(svgEl('path', { d: draft, class: 't-draft', 'stroke-width': w }));
+}
+
+// Redibuja cuando algo se mueve (hover, arrastre, imágenes que terminan de cargar)
+(function frame() {
+  drawThreads();
+  requestAnimationFrame(frame);
+})();
+
+function threadHint(text) {
+  $('threadHint').textContent = text;
+  $('threadHint').classList.toggle('hidden', !text);
+}
+
+function setThreading(on) {
+  threading = on;
+  threadFrom = null;
+  pointer = null;
+  rendered.forEach((r) => r.el.classList.remove('thread-from'));
+  $('board').classList.toggle('threading', on);
+  $('spool').classList.toggle('active', on);
+  $('spool').setAttribute('aria-pressed', String(on));
+  $('spoolLabel').textContent = on ? 'Guardar hilo' : 'Hilo rojo';
+  threadHint(on ? 'Tocá la primera pista para atar el hilo · Esc para terminar' : '');
+}
+
+$('spool').addEventListener('click', () => {
+  if (editing) $('editBtn').click();
+  setThreading(!threading);
+});
+
+async function pickThreadEnd(r) {
+  if (r.doc.pending && !r.doc.kind) return toast('Esa pista todavía no fue revelada…');
+  if (!threadFrom) {
+    threadFrom = r.doc.id;
+    r.el.classList.add('thread-from');
+    threadHint('Ahora tocá la pista que querés conectar · Esc para cancelar');
+    return;
+  }
+  const from = threadFrom;
+  if (from === r.doc.id) return;
+  threadFrom = null;
+  rendered.forEach((x) => x.el.classList.remove('thread-from'));
+  threadHint('Tocá la primera pista para atar el hilo · Esc para terminar');
+  try {
+    const res = await fetch('/api/threads', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from, to: r.doc.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    threads = data.threads;
+  } catch (e) {
+    toast(e.message || 'No se pudo guardar el hilo');
+  }
+}
+
+$('board').addEventListener('pointermove', (e) => {
+  if (!threading || !threadFrom) return;
+  const rect = $('board').getBoundingClientRect();
+  pointer = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !threading || lightbox.classList.contains('open')) return;
+  if (threadFrom) setThreading(true); // cancela solo la punta suelta
+  else setThreading(false);
+});
+
+// Cortar un hilo: click sobre el hilo
+let threadToCut = null;
+svg.addEventListener('click', (e) => {
+  const g = e.target.closest('g[data-id]');
+  if (!g) return;
+  e.stopPropagation();
+  threadToCut = g.dataset.id;
+  const menu = $('threadMenu');
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  menu.classList.remove('hidden');
+});
+document.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('#threadMenu') && !e.target.closest('.threads g')) $('threadMenu').classList.add('hidden');
+});
+$('cutThread').addEventListener('click', async () => {
+  $('threadMenu').classList.add('hidden');
+  if (!threadToCut) return;
+  try {
+    const res = await fetch('/api/threads/' + threadToCut, { method: 'DELETE' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    threads = data.threads;
+  } catch (e) {
+    toast(e.message || 'No se pudo cortar el hilo');
+  }
+  threadToCut = null;
+});
 
 load();
