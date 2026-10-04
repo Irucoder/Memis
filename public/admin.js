@@ -101,13 +101,49 @@ document.querySelectorAll('input[name=when]').forEach((r) => r.addEventListener(
   if (later && !$('fPublishAt').value) $('fPublishAt').value = toLocalInput(new Date(now() + 3600000).toISOString());
 }));
 
-function readAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result);
-    fr.onerror = () => reject(new Error('No se pudo leer ' + file.name));
-    fr.readAsDataURL(file);
+// Fotos muy pesadas se achican antes de subirlas para entrar en el límite del hosting.
+async function shrinkImage(file, limit) {
+  if (file.size <= limit || !/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+  const bitmap = await createImageBitmap(file);
+  let maxSide = 3000;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.85));
+    if (blob && blob.size <= limit) {
+      return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+    }
+    maxSide = Math.round(maxSide * 0.75);
+  }
+  return file;
+}
+
+async function uploadFile(file, meta) {
+  const limit = state.maxUploadBytes || 6 * 1024 * 1024;
+  const toSend = await shrinkImage(file, limit);
+  if (toSend.size > limit) {
+    const mb = (limit / 1024 / 1024).toFixed(1);
+    throw new Error(`"${file.name}" pesa más de ${mb} MB. Comprimilo y volvé a intentar.`);
+  }
+  const r = await fetch('/api/admin/docs', {
+    method: 'POST',
+    headers: {
+      'Content-Type': toSend.type || 'application/octet-stream',
+      'X-Doc-Meta': encodeURIComponent(JSON.stringify({ ...meta, fileName: toSend.name })),
+    },
+    body: toSend,
   });
+  if (r.status === 401) location.replace('/');
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 413) throw new Error(`"${file.name}" es demasiado grande. Comprimilo y volvé a intentar.`);
+  if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
+  return data;
 }
 
 $('uploadForm').addEventListener('submit', async (e) => {
@@ -141,12 +177,8 @@ $('uploadForm').addEventListener('submit', async (e) => {
     for (let i = 0; i < jobs.length; i++) {
       const { file, ...body } = jobs[i];
       $('uploadProgress').textContent = jobs.length > 1 ? `Cargando ${i + 1} de ${jobs.length}…` : 'Cargando…';
-      if (file) {
-        body.fileName = file.name;
-        body.mime = file.type;
-        body.fileData = await readAsDataUrl(file);
-      }
-      await api('POST', '/api/admin/docs', body);
+      if (file) await uploadFile(file, body);
+      else await api('POST', '/api/admin/docs', body);
     }
     toast(jobs.length > 1 ? `${jobs.length} documentos cargados` : 'Documento cargado');
     $('uploadForm').reset();

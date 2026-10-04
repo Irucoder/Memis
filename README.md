@@ -2,13 +2,21 @@
 
 Sitio para un juego de detectives: pantalla de ingreso con contraseña, cuenta regresiva hasta la apertura y un tablero de evidencias donde van apareciendo los documentos que cargues desde el panel de administración.
 
-## Cómo correrlo
+## Publicarlo en Netlify (gratis)
 
-Requiere Node.js 18 o superior. No tiene dependencias externas.
+1. Entrá a https://app.netlify.com y creá una cuenta (podés usar tu cuenta de GitHub).
+2. **Add new site → Import an existing project → GitHub** y elegí el repositorio **Memis**.
+3. En **Branch to deploy** elegí la rama donde está este código. Netlify toma el resto de la configuración de `netlify.toml`: no hace falta completar *build command* ni *publish directory*.
+4. Antes de publicar (o después, en **Site configuration → Environment variables**) agregá:
+   - `ADMIN_PASSWORD` → tu contraseña de administración (si no la ponés, queda `ADMIN-MEMIS`).
+   - `SESSION_SECRET` → cualquier texto largo y aleatorio (opcional, recomendado).
+5. **Deploy**. Netlify te da una dirección tipo `https://nombre.netlify.app` (la podés cambiar en *Site configuration → Change site name*).
 
-```bash
-npm start            # http://localhost:3000
-```
+Si cambiás variables de entorno después, hacé **Deploys → Trigger deploy** para que se apliquen.
+
+Los documentos y la configuración se guardan en **Netlify Blobs**, el almacenamiento propio de Netlify: no se borran al volver a publicar y no hay que configurar nada.
+
+**Límite:** cada archivo puede pesar hasta unos **5,8 MB** (límite de Netlify). Las fotos más pesadas se achican solas al subirlas; los PDF grandes hay que comprimirlos antes (por ejemplo con ilovepdf.com).
 
 ## Contraseñas
 
@@ -30,8 +38,20 @@ No distinguen mayúsculas/minúsculas. Se pueden cambiar con variables de entorn
 
 Los archivos de documentos no publicados nunca se envían a los jugadores: el servidor solo manda la silueta (si corresponde) hasta la hora programada.
 
-## Publicarlo
+## Probarlo en tu computadora
 
-Necesita un hosting que corra Node y tenga disco persistente (Render, Railway, Fly.io, un VPS…). GitHub Pages no sirve porque hace falta el servidor. Los datos se guardan en `data/` (o en la carpeta de `DATA_DIR`): asegurate de que esa carpeta sea persistente.
+Requiere Node.js 20 o superior.
 
-Variables útiles: `PORT`, `DATA_DIR`, `MAX_UPLOAD_MB` (25 por defecto), `SESSION_SECRET`.
+```bash
+npm install
+npm start            # http://localhost:3000
+```
+
+En local los datos se guardan en la carpeta `data/`.
+
+## Estructura
+
+- `public/` — páginas, estilos y scripts del navegador.
+- `lib/core.js` — reglas del juego (contraseñas, horarios, visibilidad de documentos).
+- `netlify/functions/api.mjs` — función de Netlify que usa `lib/core.js` con Netlify Blobs.
+- `server.js` — servidor local que usa `lib/core.js` con la carpeta `data/`.
