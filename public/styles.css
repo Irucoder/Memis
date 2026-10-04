@@ -86,13 +86,35 @@ button, input, select, textarea { font: inherit; color: inherit; }
   width: 128px; height: 14px; margin-left: -64px;
   border-radius: 50%;
   background: radial-gradient(ellipse at center, rgba(235, 245, 255, 0.9), rgba(160, 190, 220, 0.25) 70%, transparent);
+  animation: flicker 7s infinite;
 }
 
 @keyframes flicker {
-  0%, 91%, 94%, 100% { opacity: 1; }
-  92% { opacity: 0.55; }
-  93% { opacity: 0.9; }
-  95% { opacity: 0.7; }
+  0%, 90.5%, 96%, 100% { opacity: 1; }
+  91.5% { opacity: 0.2; }
+  92.5% { opacity: 0.9; }
+  93.5% { opacity: 0.35; }
+  95% { opacity: 0.8; }
+}
+
+/* Cuando la lámpara parpadea, la habitación se oscurece al mismo ritmo.
+   Queda por debajo del tablero (z-index 10), que mantiene su color. */
+.room::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: #02050a;
+  opacity: 0;
+  animation: room-dim 7s infinite;
+}
+@keyframes room-dim {
+  0%, 90.5%, 96%, 100% { opacity: 0; }
+  91.5% { opacity: 0.62; }
+  92.5% { opacity: 0.08; }
+  93.5% { opacity: 0.5; }
+  95% { opacity: 0.15; }
 }
 
 .vignette {
