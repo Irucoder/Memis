@@ -16,6 +16,7 @@ const UPLOAD_DIR = path.join(DATA_DIR, 'uploads');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SECRET_FILE = path.join(DATA_DIR, 'secret');
 const THREADS_FILE = path.join(DATA_DIR, 'threads.json');
+const LAYOUTS_FILE = path.join(DATA_DIR, 'layouts.json');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -25,6 +26,7 @@ const safeName = (name) => path.basename(name);
 
 // Un solo proceso: alcanza con encadenar las escrituras de hilos
 let threadsQueue = Promise.resolve();
+let layoutsQueue = Promise.resolve();
 function writeThreads(fn) {
   const run = threadsQueue.then(async () => {
     const raw = await readOrNull(THREADS_FILE, 'utf8');
@@ -61,6 +63,18 @@ const handle = createHandler(
     },
     deleteThread: (id) => writeThreads((list) => list.filter((t) => t.id !== id)),
     clearThreads: () => writeThreads(() => []),
+    async readLayouts() {
+      const raw = await readOrNull(LAYOUTS_FILE, 'utf8');
+      return raw ? JSON.parse(raw) : {};
+    },
+    updateLayouts(fn) {
+      const run = layoutsQueue.then(async () => {
+        const raw = await readOrNull(LAYOUTS_FILE, 'utf8');
+        await fsp.writeFile(LAYOUTS_FILE, JSON.stringify(fn(raw ? JSON.parse(raw) : {}), null, 2));
+      });
+      layoutsQueue = run.catch(() => {});
+      return run;
+    },
   },
   {
     passwords: {

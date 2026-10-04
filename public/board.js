@@ -2,7 +2,7 @@
 
 const $ = (id) => document.getElementById(id);
 const POLL_MS = 15000;
-const PDFJS = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+const PDFJS = '/vendor/pdfjs/'; // lector de PDF incluido en el sitio (pdf.js 3.11)
 
 let role = null;
 let clockOffset = 0; // serverNow - Date.now()
@@ -125,7 +125,7 @@ function showBoard(docs) {
     seen.add(d.id);
     const sig = JSON.stringify(d);
     const prev = rendered.get(d.id);
-    if (prev && prev.sig === sig) continue;
+    if (prev && (prev.sig === sig || unsaved.has(d.id))) continue; // no pisar un movimiento que se está guardando
     const el = buildDoc(d);
     const becameVisible = !prev || (prev.doc.pending && !d.pending);
     if (!firstRender && becameVisible) el.classList.add('appear');
@@ -195,7 +195,7 @@ function buildDoc(d) {
     body.appendChild(img);
   } else {
     body.appendChild(fileCard(d));
-    if (isPdf(d)) renderPdfThumb(d.file, body);
+    if (isPdf(d)) renderPdfThumb(d.file, el, body);
   }
 
   if (d.style === 'polaroid' && d.kind !== 'text') {
@@ -238,21 +238,67 @@ function loadPdfJs() {
   return pdfjsReady;
 }
 
-async function renderPdfThumb(url, body) {
+const pdfCache = new Map(); // url -> Promise<PDFDocumentProxy>
+function getPdf(url) {
+  if (!pdfCache.has(url)) {
+    const p = loadPdfJs().then((pdfjs) => pdfjs.getDocument(url).promise);
+    p.catch(() => pdfCache.delete(url));
+    pdfCache.set(url, p);
+  }
+  return pdfCache.get(url);
+}
+
+async function renderPage(pdf, number, cssWidth) {
+  const page = await pdf.getPage(number);
+  const base = page.getViewport({ scale: 1 });
+  const ratio = Math.min(2, window.devicePixelRatio || 1);
+  const viewport = page.getViewport({ scale: (cssWidth * ratio) / base.width });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+  return canvas;
+}
+
+// Miniatura en el tablero. Si el PDF tiene más páginas, quedan hojas debajo
+// que asoman la esquina inferior al pasar el mouse.
+async function renderPdfThumb(url, el, body) {
   try {
-    const pdfjs = await loadPdfJs();
-    const pdf = await pdfjs.getDocument(url).promise;
-    const page = await pdf.getPage(1);
-    const base = page.getViewport({ scale: 1 });
-    const viewport = page.getViewport({ scale: 520 / base.width });
-    const canvas = document.createElement('canvas');
-    canvas.width = viewport.width;
-    canvas.height = viewport.height;
-    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    body.replaceChildren(canvas);
+    const pdf = await getPdf(url);
+    body.replaceChildren(await renderPage(pdf, 1, 260));
     body.classList.add('has-media');
+    const extra = Math.min(2, pdf.numPages - 1);
+    for (let i = extra; i >= 1; i--) {
+      const sheet = document.createElement('div');
+      sheet.className = 'doc-under u' + i;
+      sheet.appendChild(await renderPage(pdf, i + 1, 260));
+      el.insertBefore(sheet, body);
+    }
+    if (extra) el.classList.add('multi-page');
   } catch {
     // se queda la tarjeta genérica
+  }
+}
+
+// Visor: las páginas como hojas, sin la barra del navegador
+async function renderPdfPages(d, container) {
+  const status = Object.assign(document.createElement('div'), { className: 'lb-status', textContent: 'Abriendo documento…' });
+  container.appendChild(status);
+  try {
+    const pdf = await getPdf(d.file);
+    const width = Math.min(900, window.innerWidth - 48);
+    status.remove();
+    for (let n = 1; n <= pdf.numPages; n++) {
+      if (!lightbox.classList.contains('open') || !container.isConnected) return;
+      const sheet = document.createElement('div');
+      sheet.className = 'lb-sheet';
+      sheet.style.width = width + 'px';
+      sheet.appendChild(await renderPage(pdf, n, width));
+      container.appendChild(sheet);
+    }
+  } catch {
+    status.remove();
+    container.appendChild(Object.assign(document.createElement('iframe'), { src: d.file, title: d.title || 'Documento PDF' }));
   }
 }
 
@@ -275,9 +321,9 @@ function openLightbox(d) {
   } else if (isImage(d)) {
     content.appendChild(Object.assign(document.createElement('img'), { src: d.file, alt: d.title || '' }));
   } else if (isPdf(d)) {
-    content.appendChild(Object.assign(document.createElement('iframe'), { src: d.file, title: d.title || 'Documento PDF' }));
-    dl.href = d.file;
-    dl.classList.remove('hidden');
+    const pages = Object.assign(document.createElement('div'), { className: 'lb-pages' });
+    content.appendChild(pages);
+    renderPdfPages(d, pages);
   } else {
     const paper = document.createElement('div');
     paper.className = 'lb-paper';
@@ -314,7 +360,7 @@ function docFromEvent(e) {
 }
 
 $('board').addEventListener('click', (e) => {
-  if (editing) return;
+  if (suppressClick) { suppressClick = false; return; }
   const r = docFromEvent(e);
   if (threading) return r && pickThreadEnd(r);
   if (!r) return;
@@ -325,14 +371,16 @@ $('board').addEventListener('click', (e) => {
 $('board').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const r = docFromEvent(e);
-  if (!r || editing) return;
+  if (!r) return;
   e.preventDefault();
   if (threading) return pickThreadEnd(r);
   if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
   openLightbox(r.doc);
 });
 
-// ---------- Modo acomodar (solo admin) ----------
+// ---------- Acomodar ----------
+// Cualquiera puede arrastrar las pistas reveladas; la posición se guarda para todos.
+// El admin además puede rotar y cambiar el tamaño en modo "Acomodar".
 
 $('editBtn').addEventListener('click', () => {
   setThreading(false);
@@ -342,59 +390,65 @@ $('editBtn').addEventListener('click', () => {
   $('editHint').classList.toggle('hidden', !editing);
 });
 
+let suppressClick = false;
+let pressed = null;
+const DRAG_THRESHOLD = 6;
+
 const saveTimers = new Map();
-function saveLayout(r, fields) {
-  Object.assign(r.doc, fields);
+const unsaved = new Set();
+function saveLayout(r) {
   r.sig = JSON.stringify(r.doc);
+  unsaved.add(r.doc.id);
   clearTimeout(saveTimers.get(r.doc.id));
   saveTimers.set(r.doc.id, setTimeout(async () => {
-    const res = await fetch('/api/admin/docs/' + r.doc.id, {
-      method: 'PATCH',
+    const { x, y, z, rot, w } = r.doc;
+    const res = await fetch('/api/layout/' + r.doc.id, {
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ x: r.doc.x, y: r.doc.y, w: r.doc.w, rot: r.doc.rot, z: r.doc.z }),
+      body: JSON.stringify(role === 'admin' ? { x, y, z, rot, w } : { x, y, z }),
     }).catch(() => null);
     if (!res || !res.ok) toast('No se pudo guardar la posición');
-  }, 400));
+    unsaved.delete(r.doc.id);
+  }, 300));
 }
 
 const maxZ = () => Math.max(0, ...[...rendered.values()].map((r) => r.doc.z || 0));
 
 $('board').addEventListener('pointerdown', (e) => {
-  if (!editing) return;
+  if (threading || e.button > 0) return;
   const r = docFromEvent(e);
   if (!r) return;
-  e.preventDefault();
-  const rect = $('board').getBoundingClientRect();
-  dragging = {
-    r,
-    rect,
-    startX: e.clientX,
-    startY: e.clientY,
-    x0: r.doc.x,
-    y0: r.doc.y,
-  };
-  r.el.classList.add('dragging');
-  r.el.setPointerCapture(e.pointerId);
+  if (r.doc.pending && !r.doc.kind) return; // las siluetas no se mueven
+  pressed = { r, id: e.pointerId, startX: e.clientX, startY: e.clientY, x0: r.doc.x, y0: r.doc.y };
 });
 
 $('board').addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  const { r, rect, startX, startY, x0, y0 } = dragging;
-  const x = Math.min(100, Math.max(0, x0 + ((e.clientX - startX) / rect.width) * 100));
-  const y = Math.min(100, Math.max(0, y0 + ((e.clientY - startY) / rect.height) * 100));
-  r.doc.x = Math.round(x * 100) / 100;
-  r.doc.y = Math.round(y * 100) / 100;
+  if (!pressed || e.pointerId !== pressed.id) return;
+  const { r, startX, startY, x0, y0 } = pressed;
+  if (!dragging) {
+    if (Math.hypot(e.clientX - startX, e.clientY - startY) < DRAG_THRESHOLD) return;
+    dragging = { r, rect: $('board').getBoundingClientRect() };
+    r.el.classList.add('dragging');
+    r.el.setPointerCapture(e.pointerId);
+  }
+  const { rect } = dragging;
+  r.doc.x = Math.round(Math.min(100, Math.max(0, x0 + ((e.clientX - startX) / rect.width) * 100)) * 100) / 100;
+  r.doc.y = Math.round(Math.min(100, Math.max(0, y0 + ((e.clientY - startY) / rect.height) * 100)) * 100) / 100;
   placeDoc(r.el, r.doc);
 });
 
 function endDrag() {
-  if (!dragging) return;
-  const { r } = dragging;
+  const wasDragging = dragging;
+  pressed = null;
+  if (!wasDragging) return;
+  const { r } = wasDragging;
+  dragging = null;
+  suppressClick = true; // el click que sigue al soltar no abre el documento
+  setTimeout(() => { suppressClick = false; }, 0);
   r.el.classList.remove('dragging');
   r.doc.z = maxZ() + 1;
   placeDoc(r.el, r.doc);
-  saveLayout(r, {});
-  dragging = null;
+  saveLayout(r);
 }
 $('board').addEventListener('pointerup', endDrag);
 $('board').addEventListener('pointercancel', endDrag);
@@ -408,7 +462,7 @@ $('board').addEventListener('wheel', (e) => {
   if (e.shiftKey) r.doc.w = Math.min(60, Math.max(4, Math.round((r.doc.w + dir * 0.5) * 10) / 10));
   else r.doc.rot = Math.min(45, Math.max(-45, Math.round((r.doc.rot + dir) * 10) / 10));
   placeDoc(r.el, r.doc);
-  saveLayout(r, {});
+  saveLayout(r);
 }, { passive: false });
 
 // ---------- Hilo rojo ----------

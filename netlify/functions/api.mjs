@@ -31,6 +31,20 @@ function getHandler() {
       },
       addThread: (id) => store.set('threads/' + id, '1'),
       deleteThread: (id) => store.delete('threads/' + id),
+      async readLayouts() {
+        return (await store.get('layouts', { type: 'json' })) || {};
+      },
+      // Escritura condicional: si dos personas mueven pistas a la vez, ninguna pisa a la otra.
+      async updateLayouts(fn) {
+        for (let attempt = 0; attempt < 8; attempt++) {
+          const current = await store.getWithMetadata('layouts', { type: 'json' });
+          const next = fn((current && current.data) || {});
+          const opts = current ? { onlyIfMatch: current.etag } : { onlyIfNew: true };
+          const { modified } = await store.setJSON('layouts', next, opts);
+          if (modified) return next;
+        }
+        throw new Error('No se pudo guardar la posición');
+      },
       async clearThreads() {
         const { blobs } = await store.list({ prefix: 'threads/' });
         await Promise.all(blobs.map((b) => store.delete(b.key)));

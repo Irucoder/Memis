@@ -1,4 +1,5 @@
 :root {
+  --lupa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='34' height='34' viewBox='0 0 34 34'%3E%3Cpath d='M20.5 20.5 30 30' stroke='%23000' stroke-opacity='.45' stroke-width='7' stroke-linecap='round'/%3E%3Cpath d='M20.5 20.5 30 30' stroke='%233a2a14' stroke-width='5.5' stroke-linecap='round'/%3E%3Cpath d='M21 21 29.3 29.3' stroke='%23c9963d' stroke-width='2.5' stroke-linecap='round'/%3E%3Ccircle cx='13' cy='13' r='9.5' fill='%23dff1ff' fill-opacity='.28' stroke='%23000' stroke-opacity='.45' stroke-width='4.5'/%3E%3Ccircle cx='13' cy='13' r='9.5' fill='none' stroke='%23d4a54a' stroke-width='2.6'/%3E%3Cpath d='M8 10.5a6 6 0 0 1 4-4' fill='none' stroke='%23fff' stroke-opacity='.85' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") 13 13, zoom-in;
   --wall-1: #1c3247;
   --wall-2: #10202f;
   --wall-3: #060c13;
@@ -403,7 +404,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   position: absolute;
   transform: translate(-50%, -50%) rotate(var(--rot));
   transform-origin: center;
-  cursor: zoom-in;
+  cursor: var(--lupa);
+  touch-action: none; /* en el celular, arrastrar una pista no mueve la página */
   filter: drop-shadow(0 0.7cqw 0.8cqw rgba(0, 0, 0, 0.5)) brightness(0.93);
   transition: transform 0.35s cubic-bezier(.2,.8,.3,1.3), filter 0.3s;
   user-select: none;
@@ -421,7 +423,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
   30% { transform: rotate(-1.4deg); }
   70% { transform: rotate(1.1deg); }
 }
-.doc-body { position: relative; transform-origin: 50% 0; }
+.doc-body { position: relative; z-index: 1; transform-origin: 50% 0; }
+
+/* PDF de varias páginas: hojas debajo que asoman la esquina inferior */
+.doc-under {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: #f7f5ef;
+  box-shadow: 0 0.2cqw 0.5cqw rgba(0, 0, 0, 0.3);
+  transform-origin: 0 0;
+  transition: transform 0.45s cubic-bezier(.2,.8,.3,1.2);
+}
+.doc-under.u1 { transform: translate(1.2%, 1.2%) rotate(0.6deg); }
+.doc-under.u2 { transform: translate(2.2%, 2.4%) rotate(1.2deg); background: #efece4; }
+.doc:hover .doc-under.u1, .doc:focus-visible .doc-under.u1 { transform: translate(9%, 10%) rotate(5deg); }
+.doc:hover .doc-under.u2, .doc:focus-visible .doc-under.u2 { transform: translate(14%, 16%) rotate(9deg); }
+.doc.multi-page .doc-body.has-media { padding: 0; } /* la página del PDF es la hoja */
+.doc.dragging .doc-under.u1 { transform: translate(1.2%, 1.2%) rotate(0.6deg); }
+.doc.dragging .doc-under.u2 { transform: translate(2.2%, 2.4%) rotate(1.2deg); }
 .doc-body > .doc-title:first-child { margin-top: 1.1cqw; } /* deja lugar a la chinche */
 .doc img, .doc canvas { display: block; width: 100%; height: auto; pointer-events: none; }
 
@@ -580,9 +601,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .doc.is-scheduled .doc-body { opacity: 0.6; }
 
-.board.editing .doc { cursor: grab; }
+.doc.dragging { cursor: grabbing; transition: filter 0.3s; z-index: 10000 !important; }
+.doc.dragging .doc-body { animation: none !important; }
 .board.editing .doc:hover .doc-body { animation: none; }
-.board.editing .doc.dragging { cursor: grabbing; transition: none; z-index: 10000 !important; }
 .board.editing { outline: 1px dashed rgba(241, 230, 74, 0.35); outline-offset: 8px; }
 
 /* ---------- Hilos ---------- */
@@ -716,6 +737,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @keyframes zoomIn { from { transform: scale(0.9) rotate(-2deg); opacity: 0; } }
 .lightbox img { display: block; max-width: 100%; max-height: calc(100dvh - 120px); margin: 0 auto; box-shadow: 0 20px 60px rgba(0,0,0,0.7); }
 .lightbox iframe { width: min(1000px, 92vw); height: calc(100dvh - 120px); border: 0; background: #fff; }
+.lightbox .lb-pages { display: flex; flex-direction: column; align-items: center; gap: 22px; padding-bottom: 8px; }
+.lightbox .lb-sheet { max-width: 100%; background: #fff; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.65); }
+.lightbox .lb-sheet canvas { display: block; width: 100%; height: auto; }
+.lightbox .lb-status { font-family: var(--font-type); color: var(--text-dim); letter-spacing: 0.12em; padding: 40px; }
 .lightbox .lb-paper {
   width: min(760px, 92vw);
   padding: clamp(24px, 5vw, 56px);
