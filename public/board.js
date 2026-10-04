@@ -42,7 +42,6 @@ async function load() {
   role = s.role;
   unlockAt = s.unlockAt ? new Date(s.unlockAt).getTime() : null;
 
-  $('previewBadge').classList.toggle('hidden', role !== 'preview');
   $('editBtn').classList.toggle('hidden', role !== 'admin');
   $('adminLink').classList.toggle('hidden', role !== 'admin');
 
@@ -80,7 +79,6 @@ function formatWhen(ts) {
 function showWait() {
   $('boardView').classList.add('hidden');
   $('waitView').classList.remove('hidden');
-  $('caseId').textContent = 'Exp. 0417 · Acceso restringido';
 
   if (unlockAt === null) {
     $('cdLabel').textContent = 'Acceso aún no habilitado';
@@ -119,7 +117,6 @@ function showBoard(docs) {
   tickTimer = null;
   $('waitView').classList.add('hidden');
   $('boardView').classList.remove('hidden');
-  $('caseId').textContent = 'Exp. 0417 · Tablero de evidencias';
   if (dragging) return; // no pisar lo que el admin está moviendo
 
   const board = $('board');

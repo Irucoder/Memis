@@ -321,7 +321,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   color: var(--text-dim);
   text-transform: uppercase;
 }
-.topbar .actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.topbar .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 
 .board-scroll {
   position: relative;
@@ -330,17 +330,17 @@ button, input, select, textarea { font: inherit; color: inherit; }
   min-height: 100vh;
   min-height: 100dvh;
   overflow: auto;
-  padding: 120px 120px 40px;
+  padding: 200px 120px 40px; /* aire entre la lámpara y el corcho */
 }
 @media (max-width: 900px) {
-  .board-scroll { padding: 120px 16px 120px; }
+  .board-scroll { padding: 180px 16px 120px; }
 }
 .board {
   position: relative;
   container-type: inline-size;
   /* entra completo en la pantalla, debajo de la lámpara */
-  width: min(100%, calc((100vh - 150px) * 923 / 608));
-  width: min(100%, calc((100dvh - 150px) * 923 / 608));
+  width: min(100%, calc((100vh - 240px) * 923 / 608));
+  width: min(100%, calc((100dvh - 240px) * 923 / 608));
   max-width: 1500px;
   min-width: 860px;
   aspect-ratio: 923 / 608;

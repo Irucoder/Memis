@@ -142,11 +142,6 @@
 
     const go = (role) => location.replace(role === 'admin' ? '/admin' : '/tablero');
 
-    fetch('/api/state', { credentials: 'same-origin' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((s) => { if (s) go(s.role); })
-      .catch(() => {});
-
     // Cualquier click en la carpeta enfoca la casilla
     document.addEventListener('mousedown', (e) => {
       if (e.target === input) return;
