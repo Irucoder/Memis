@@ -27,6 +27,9 @@ Los documentos y la configuración se guardan en **Netlify Blobs**, el almacenam
 - **Acomodar**: cualquiera puede arrastrar las pistas reveladas a otro lugar del corcho; la posición se guarda para todos. El admin, con el botón *Acomodar*, además puede rotarlas y cambiarles el tamaño (rueda del mouse / Shift + rueda).
 - **PDF**: se ve la primera página en el corcho; si tiene más páginas, al pasar el mouse asoman las hojas de abajo. Al abrirlo se muestran todas las páginas como hojas, sin la barra del visor del navegador (usa pdf.js, incluido en `public/vendor/pdfjs`).
 
+- **Post-its**: debajo del carretel hay un bloc. Tocándolo aparece un post-it en el corcho para escribir una palabra o frase corta (hasta 80 caracteres). Se pueden mover, editar (click), despegar (×) y atar con hilo rojo. Se guardan para todos.
+- **Límites**: ninguna pista ni post-it se puede ubicar fuera del corcho.
+
 Para cambiar las imágenes, reemplazá esos archivos manteniendo el nombre (si cambia la proporción de la portada, hay que reajustar la posición de la casilla en `public/index.html`).
 
 ## Contraseñas

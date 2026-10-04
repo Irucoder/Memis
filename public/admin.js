@@ -65,6 +65,9 @@ function renderSettings() {
   const n = state.threadCount || 0;
   $('threadStatus').textContent = n === 0 ? 'Todavía no hay hilos.' : n === 1 ? 'Hay 1 hilo en el tablero.' : `Hay ${n} hilos en el tablero.`;
   $('clearThreads').disabled = n === 0;
+  const m = state.noteCount || 0;
+  $('noteStatus').textContent = m === 0 ? 'Todavía no hay post-its.' : m === 1 ? 'Hay 1 post-it en el tablero.' : `Hay ${m} post-its en el tablero.`;
+  $('clearNotes').disabled = m === 0;
 }
 
 async function saveSettings(patch, msg) {
@@ -86,6 +89,16 @@ $('saveUnlock').addEventListener('click', () => {
 $('openNow').addEventListener('click', () => saveSettings({ unlockAt: new Date(now()).toISOString() }, 'Sitio abierto'));
 $('closeSite').addEventListener('click', () => {
   if (confirm('¿Cerrar el sitio para los jugadores sin fecha de apertura?')) saveSettings({ unlockAt: null }, 'Sitio cerrado');
+});
+$('clearNotes').addEventListener('click', async () => {
+  if (!confirm('¿Borrar todos los post-its que escribieron los jugadores? No se puede deshacer.')) return;
+  try {
+    await api('DELETE', '/api/admin/notes');
+    toast('Post-its borrados');
+    await load();
+  } catch (e) {
+    toast(e.message);
+  }
 });
 $('clearThreads').addEventListener('click', async () => {
   if (!confirm('¿Borrar todos los hilos que conectaron los jugadores? No se puede deshacer.')) return;

@@ -17,6 +17,7 @@ const DB_FILE = path.join(DATA_DIR, 'db.json');
 const SECRET_FILE = path.join(DATA_DIR, 'secret');
 const THREADS_FILE = path.join(DATA_DIR, 'threads.json');
 const LAYOUTS_FILE = path.join(DATA_DIR, 'layouts.json');
+const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -26,13 +27,25 @@ const safeName = (name) => path.basename(name);
 
 // Un solo proceso: alcanza con encadenar las escrituras de hilos
 let threadsQueue = Promise.resolve();
-let layoutsQueue = Promise.resolve();
 function writeThreads(fn) {
   const run = threadsQueue.then(async () => {
     const raw = await readOrNull(THREADS_FILE, 'utf8');
     await fsp.writeFile(THREADS_FILE, JSON.stringify(fn(raw ? JSON.parse(raw) : []), null, 2));
   });
   threadsQueue = run.catch(() => {});
+  return run;
+}
+
+const readJSON = async (file) => {
+  const raw = await readOrNull(file, 'utf8');
+  return raw ? JSON.parse(raw) : {};
+};
+const queues = new Map();
+function updateJSON(file, fn) {
+  const run = (queues.get(file) || Promise.resolve()).then(async () => {
+    await fsp.writeFile(file, JSON.stringify(fn(await readJSON(file)), null, 2));
+  });
+  queues.set(file, run.catch(() => {}));
   return run;
 }
 
@@ -63,18 +76,10 @@ const handle = createHandler(
     },
     deleteThread: (id) => writeThreads((list) => list.filter((t) => t.id !== id)),
     clearThreads: () => writeThreads(() => []),
-    async readLayouts() {
-      const raw = await readOrNull(LAYOUTS_FILE, 'utf8');
-      return raw ? JSON.parse(raw) : {};
-    },
-    updateLayouts(fn) {
-      const run = layoutsQueue.then(async () => {
-        const raw = await readOrNull(LAYOUTS_FILE, 'utf8');
-        await fsp.writeFile(LAYOUTS_FILE, JSON.stringify(fn(raw ? JSON.parse(raw) : {}), null, 2));
-      });
-      layoutsQueue = run.catch(() => {});
-      return run;
-    },
+    readLayouts: () => readJSON(LAYOUTS_FILE),
+    updateLayouts: (fn) => updateJSON(LAYOUTS_FILE, fn),
+    readNotes: () => readJSON(NOTES_FILE),
+    updateNotes: (fn) => updateJSON(NOTES_FILE, fn),
   },
   {
     passwords: {

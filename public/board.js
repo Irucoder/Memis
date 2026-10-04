@@ -14,6 +14,33 @@ let threads = [];
 let threading = false;
 let threadFrom = null; // id del documento donde se ató la primera punta
 const rendered = new Map(); // id -> { el, sig, doc }
+const notesMap = new Map(); // id -> { el, sig, doc: nota, type: 'note' }
+
+// Marco del corcho, en % del tablero: nada se puede ubicar encima de la madera
+const FRAME_X = 3.8;
+const FRAME_Y = 5.6;
+
+function fitInside(r, x, y) {
+  const board = $('board');
+  const hw = (r.el.offsetWidth / 2 / board.clientWidth) * 100;
+  const hh = (r.el.offsetHeight / 2 / board.clientHeight) * 100;
+  const clampAxis = (v, frame, half) => {
+    const min = frame + half;
+    const max = 100 - frame - half;
+    return min > max ? 50 : Math.min(max, Math.max(min, v));
+  };
+  return { x: clampAxis(x, FRAME_X, hw), y: clampAxis(y, FRAME_Y, hh) };
+}
+
+// Si algo quedó afuera del corcho (por ejemplo, de antes de este límite), se muestra adentro
+function keepInside(r) {
+  const { x, y } = fitInside(r, r.doc.x, r.doc.y);
+  if (Math.abs(x - r.doc.x) > 0.01 || Math.abs(y - r.doc.y) > 0.01) {
+    r.doc.x = x;
+    r.doc.y = y;
+    placeDoc(r.el, r.doc);
+  }
+}
 
 const now = () => Date.now() + clockOffset;
 const pad = (n) => String(n).padStart(2, '0');
@@ -46,12 +73,14 @@ async function load() {
   $('adminLink').classList.toggle('hidden', role !== 'admin');
 
   $('spool').classList.toggle('hidden', s.locked);
+  $('notepad').classList.toggle('hidden', s.locked);
   if (s.locked) {
     setThreading(false);
     showWait();
   } else {
     threads = s.threads || [];
     showBoard(s.docs);
+    showNotes(s.notes || []);
   }
 }
 
@@ -131,7 +160,10 @@ function showBoard(docs) {
     if (!firstRender && becameVisible) el.classList.add('appear');
     if (prev) prev.el.replaceWith(el);
     else board.appendChild(el);
-    rendered.set(d.id, { el, sig, doc: d });
+    const entry = { el, sig, doc: d };
+    rendered.set(d.id, entry);
+    keepInside(entry);
+    el.querySelectorAll('img').forEach((img) => img.addEventListener('load', () => keepInside(entry), { once: true }));
   }
   for (const [id, r] of rendered) {
     if (!seen.has(id)) {
@@ -355,25 +387,30 @@ document.addEventListener('keydown', (e) => {
 });
 
 function docFromEvent(e) {
-  const el = e.target.closest('.doc');
-  return el && rendered.get(el.dataset.id);
+  const el = e.target.closest('.doc, .note');
+  if (!el) return null;
+  return el.classList.contains('note') ? notesMap.get(el.dataset.id) : rendered.get(el.dataset.id);
 }
 
 $('board').addEventListener('click', (e) => {
   if (suppressClick) { suppressClick = false; return; }
+  if (e.target.closest('.note-del, .note-input')) return;
   const r = docFromEvent(e);
   if (threading) return r && pickThreadEnd(r);
   if (!r) return;
+  if (r.type === 'note') return editNote(r);
   if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
   openLightbox(r.doc);
 });
 
 $('board').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter' && e.key !== ' ') return;
+  if (e.target.closest('.note-input')) return;
   const r = docFromEvent(e);
   if (!r) return;
   e.preventDefault();
   if (threading) return pickThreadEnd(r);
+  if (r.type === 'note') return editNote(r);
   if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
   openLightbox(r.doc);
 });
@@ -402,20 +439,22 @@ function saveLayout(r) {
   clearTimeout(saveTimers.get(r.doc.id));
   saveTimers.set(r.doc.id, setTimeout(async () => {
     const { x, y, z, rot, w } = r.doc;
-    const res = await fetch('/api/layout/' + r.doc.id, {
-      method: 'POST',
+    const isNote = r.type === 'note';
+    const res = await fetch(isNote ? '/api/notes/' + r.doc.id : '/api/layout/' + r.doc.id, {
+      method: isNote ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(role === 'admin' ? { x, y, z, rot, w } : { x, y, z }),
+      body: JSON.stringify(role === 'admin' && !isNote ? { x, y, z, rot, w } : { x, y, z }),
     }).catch(() => null);
     if (!res || !res.ok) toast('No se pudo guardar la posición');
     unsaved.delete(r.doc.id);
   }, 300));
 }
 
-const maxZ = () => Math.max(0, ...[...rendered.values()].map((r) => r.doc.z || 0));
+const maxZ = () => Math.max(0, ...[...rendered.values(), ...notesMap.values()].map((r) => r.doc.z || 0));
 
 $('board').addEventListener('pointerdown', (e) => {
   if (threading || e.button > 0) return;
+  if (e.target.closest('.note-del, .note-input')) return;
   const r = docFromEvent(e);
   if (!r) return;
   if (r.doc.pending && !r.doc.kind) return; // las siluetas no se mueven
@@ -432,8 +471,9 @@ $('board').addEventListener('pointermove', (e) => {
     r.el.setPointerCapture(e.pointerId);
   }
   const { rect } = dragging;
-  r.doc.x = Math.round(Math.min(100, Math.max(0, x0 + ((e.clientX - startX) / rect.width) * 100)) * 100) / 100;
-  r.doc.y = Math.round(Math.min(100, Math.max(0, y0 + ((e.clientY - startY) / rect.height) * 100)) * 100) / 100;
+  const p = fitInside(r, x0 + ((e.clientX - startX) / rect.width) * 100, y0 + ((e.clientY - startY) / rect.height) * 100);
+  r.doc.x = Math.round(p.x * 100) / 100;
+  r.doc.y = Math.round(p.y * 100) / 100;
   placeDoc(r.el, r.doc);
 });
 
@@ -456,14 +496,153 @@ $('board').addEventListener('pointercancel', endDrag);
 $('board').addEventListener('wheel', (e) => {
   if (!editing) return;
   const r = docFromEvent(e);
-  if (!r) return;
+  if (!r || r.type === 'note') return;
   e.preventDefault();
   const dir = (e.deltaY || e.deltaX) > 0 ? 1 : -1;
   if (e.shiftKey) r.doc.w = Math.min(60, Math.max(4, Math.round((r.doc.w + dir * 0.5) * 10) / 10));
   else r.doc.rot = Math.min(45, Math.max(-45, Math.round((r.doc.rot + dir) * 10) / 10));
   placeDoc(r.el, r.doc);
+  keepInside(r);
   saveLayout(r);
 }, { passive: false });
+
+// ---------- Post-its ----------
+// Notas cortas que escribe cualquier jugador. Se pueden mover, editar,
+// despegar y atar con hilo como cualquier pista.
+
+const NOTE_W = 6.4; // ancho en % del tablero
+let editingNote = null;
+
+function buildNote(n) {
+  const el = document.createElement('div');
+  el.className = 'note';
+  el.dataset.id = n.id;
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.setAttribute('aria-label', 'Post-it: ' + (n.text || 'vacío'));
+  placeDoc(el, { ...n, w: NOTE_W });
+  el.innerHTML = '<span class="pin"></span><span class="note-text"></span><button class="note-del" type="button" title="Despegar post-it" aria-label="Despegar post-it">×</button>';
+  el.querySelector('.note-text').textContent = n.text;
+  return el;
+}
+
+function showNotes(list) {
+  if (dragging) return;
+  const board = $('board');
+  const seen = new Set();
+  for (const n of list) {
+    seen.add(n.id);
+    const sig = JSON.stringify(n);
+    const prev = notesMap.get(n.id);
+    if (prev && (prev.sig === sig || unsaved.has(n.id) || editingNote === prev)) continue;
+    const el = buildNote(n);
+    if (prev) prev.el.replaceWith(el);
+    else board.appendChild(el);
+    const entry = { el, sig, doc: { ...n, w: NOTE_W }, type: 'note' };
+    notesMap.set(n.id, entry);
+    keepInside(entry);
+  }
+  for (const [id, r] of notesMap) {
+    if (!seen.has(id) && editingNote !== r && !unsaved.has(id)) {
+      r.el.remove();
+      notesMap.delete(id);
+    }
+  }
+}
+
+async function noteRequest(method, url, body) {
+  const res = await fetch(url, {
+    method,
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  }).catch(() => null);
+  const data = res ? await res.json().catch(() => ({})) : {};
+  if (!res || !res.ok) throw new Error(data.error || 'No se pudo guardar el post-it');
+  return data;
+}
+
+function editNote(r, isNew = false) {
+  if (editingNote) return;
+  editingNote = r;
+  const textEl = r.el.querySelector('.note-text');
+  const input = document.createElement('textarea');
+  input.className = 'note-input';
+  input.maxLength = 80;
+  input.value = r.doc.text || '';
+  input.placeholder = 'Escribí…';
+  textEl.replaceWith(input);
+  r.el.classList.add('editing');
+  input.focus();
+  input.select();
+
+  let done = false;
+  const finish = async (save) => {
+    if (done) return;
+    done = true;
+    const text = input.value.replace(/\s+/g, ' ').trim();
+    input.replaceWith(textEl);
+    r.el.classList.remove('editing');
+    editingNote = null;
+    if (save && !text && isNew) return removeNote(r, false);
+    if (!save || text === r.doc.text || !text) return;
+    textEl.textContent = text;
+    r.doc.text = text;
+    r.sig = JSON.stringify({ ...r.doc, w: undefined });
+    try {
+      await noteRequest('PATCH', '/api/notes/' + r.doc.id, { text });
+    } catch (e) {
+      toast(e.message);
+    }
+  };
+  input.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+    if (e.key === 'Escape') { e.preventDefault(); finish(!isNew ? false : true); }
+  });
+  input.addEventListener('blur', () => finish(true));
+}
+
+async function removeNote(r, ask = true) {
+  if (ask && r.doc.text && !confirm('¿Despegar este post-it? Lo deja de ver todo el grupo.')) return;
+  r.el.remove();
+  notesMap.delete(r.doc.id);
+  threads = threads.filter((t) => t.from !== r.doc.id && t.to !== r.doc.id);
+  try {
+    await noteRequest('DELETE', '/api/notes/' + r.doc.id);
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+$('board').addEventListener('click', (e) => {
+  const del = e.target.closest('.note-del');
+  if (!del) return;
+  e.stopPropagation();
+  const r = notesMap.get(del.closest('.note').dataset.id);
+  if (r) removeNote(r);
+}, true);
+
+$('notepad').addEventListener('click', async () => {
+  setThreading(false);
+  // Aparece en la zona del corcho que se está viendo, un poco al azar
+  const board = $('board').getBoundingClientRect();
+  const cx = ((Math.min(window.innerWidth, board.right) + Math.max(0, board.left)) / 2 - board.left) / board.width * 100;
+  const cy = ((Math.min(window.innerHeight, board.bottom) + Math.max(0, board.top)) / 2 - board.top) / board.height * 100;
+  const x = cx + (Math.random() * 16 - 8);
+  const y = cy + (Math.random() * 16 - 8);
+  try {
+    const { note } = await noteRequest('POST', '/api/notes', { x, y, z: maxZ() + 1, text: '' });
+    const el = buildNote(note);
+    $('board').appendChild(el);
+    el.classList.add('appear');
+    const entry = { el, sig: JSON.stringify(note), doc: { ...note, w: NOTE_W }, type: 'note' };
+    notesMap.set(note.id, entry);
+    keepInside(entry);
+    editNote(entry, true);
+  } catch (e) {
+    toast(e.message);
+  }
+});
 
 // ---------- Hilo rojo ----------
 
@@ -480,7 +659,7 @@ function svgEl(tag, attrs) {
 
 // Centro de la chinche de cada documento, en píxeles del tablero
 function pinPoint(id, boardRect) {
-  const r = rendered.get(id);
+  const r = rendered.get(id) || notesMap.get(id);
   const pin = r && r.el.querySelector('.pin');
   if (!pin) return null;
   const p = pin.getBoundingClientRect();
@@ -545,7 +724,7 @@ function setThreading(on) {
   threading = on;
   threadFrom = null;
   pointer = null;
-  rendered.forEach((r) => r.el.classList.remove('thread-from'));
+  [...rendered.values(), ...notesMap.values()].forEach((r) => r.el.classList.remove('thread-from'));
   $('board').classList.toggle('threading', on);
   $('spool').classList.toggle('active', on);
   $('spool').setAttribute('aria-pressed', String(on));
@@ -569,7 +748,7 @@ async function pickThreadEnd(r) {
   const from = threadFrom;
   if (from === r.doc.id) return;
   threadFrom = null;
-  rendered.forEach((x) => x.el.classList.remove('thread-from'));
+  [...rendered.values(), ...notesMap.values()].forEach((x) => x.el.classList.remove('thread-from'));
   threadHint('Tocá la primera pista para atar el hilo · Esc para terminar');
   try {
     const res = await fetch('/api/threads', {

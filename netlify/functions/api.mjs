@@ -9,6 +9,19 @@ let handler = null;
 function getHandler() {
   if (handler) return handler;
   const store = getStore({ name: 'memis', consistency: 'strong' });
+
+  // Escritura condicional: si dos personas cambian a la vez (mover pistas,
+  // escribir post-its), se reintenta sobre lo último guardado y nadie pisa a nadie.
+  async function updateJSON(key, fn) {
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const current = await store.getWithMetadata(key, { type: 'json' });
+      const next = fn((current && current.data) || {});
+      const opts = current ? { onlyIfMatch: current.etag } : { onlyIfNew: true };
+      const { modified } = await store.setJSON(key, next, opts);
+      if (modified) return next;
+    }
+    throw new Error('No se pudo guardar el cambio');
+  }
   handler = createHandler(
     {
       readDb: () => store.get('db', { type: 'json' }),
@@ -31,20 +44,10 @@ function getHandler() {
       },
       addThread: (id) => store.set('threads/' + id, '1'),
       deleteThread: (id) => store.delete('threads/' + id),
-      async readLayouts() {
-        return (await store.get('layouts', { type: 'json' })) || {};
-      },
-      // Escritura condicional: si dos personas mueven pistas a la vez, ninguna pisa a la otra.
-      async updateLayouts(fn) {
-        for (let attempt = 0; attempt < 8; attempt++) {
-          const current = await store.getWithMetadata('layouts', { type: 'json' });
-          const next = fn((current && current.data) || {});
-          const opts = current ? { onlyIfMatch: current.etag } : { onlyIfNew: true };
-          const { modified } = await store.setJSON('layouts', next, opts);
-          if (modified) return next;
-        }
-        throw new Error('No se pudo guardar la posición');
-      },
+      readLayouts: async () => (await store.get('layouts', { type: 'json' })) || {},
+      updateLayouts: (fn) => updateJSON('layouts', fn),
+      readNotes: async () => (await store.get('notes', { type: 'json' })) || {},
+      updateNotes: (fn) => updateJSON('notes', fn),
       async clearThreads() {
         const { blobs } = await store.list({ prefix: 'threads/' });
         await Promise.all(blobs.map((b) => store.delete(b.key)));
