@@ -28,6 +28,8 @@ Los documentos y la configuración se guardan en **Netlify Blobs**, el almacenam
 - **PDF**: se ve la primera página en el corcho; si tiene más páginas, al pasar el mouse asoman las hojas de abajo. Al abrirlo se muestran todas las páginas como hojas, sin la barra del visor del navegador (usa pdf.js, incluido en `public/vendor/pdfjs`).
 
 - **Post-its**: debajo del carretel hay un bloc. Tocándolo aparece un post-it en el corcho para escribir una palabra o frase corta (hasta 80 caracteres). Se pueden mover, editar (click), despegar (×) y atar con hilo rojo. Se guardan para todos.
+- **Videos**: se pueden subir archivos de video (mp4, webm, mov; hasta ~5,8 MB) o cargar un **video por link** (YouTube —puede ser "oculto"—, Google Drive compartido con link, o Vimeo). En el corcho se ven como foto con botón de play y al abrirlos se reproducen.
+- **Ícono de la pestaña**: `public/favicon.ico`, `favicon-32.png` y `apple-touch-icon.png` (la lupa del Club de Memis).
 - **Límites**: ninguna pista ni post-it se puede ubicar fuera del corcho.
 
 Para cambiar las imágenes, reemplazá esos archivos manteniendo el nombre (si cambia la proporción de la portada, hay que reajustar la posición de la casilla en `public/index.html`).

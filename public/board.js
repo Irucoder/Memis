@@ -190,6 +190,34 @@ function showBoard(docs) {
 
 function isImage(d) { return d.mime && d.mime.startsWith('image/'); }
 function isPdf(d) { return d.mime === 'application/pdf'; }
+function isVideo(d) { return d.kind === 'link' || (d.mime && d.mime.startsWith('video/')); }
+
+// Videos por link: YouTube, Vimeo, Google Drive o un .mp4 directo
+function videoLink(url) {
+  let u;
+  try { u = new URL(url); } catch { return { type: 'other', url }; }
+  const host = u.hostname.replace(/^www\.|^m\./, '');
+  let id = null;
+  if (host === 'youtu.be') id = u.pathname.slice(1).split('/')[0];
+  else if (host.endsWith('youtube.com')) id = u.searchParams.get('v') || (u.pathname.match(/^\/(?:shorts|embed|live)\/([\w-]+)/) || [])[1];
+  if (id) {
+    return {
+      type: 'youtube',
+      embed: `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`,
+      thumb: `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    };
+  }
+  const vimeo = host.endsWith('vimeo.com') && u.pathname.match(/\/(\d+)/);
+  if (vimeo) return { type: 'vimeo', embed: `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1` };
+  const drive = host === 'drive.google.com' && (u.pathname.match(/\/file\/d\/([\w-]+)/) || [null, u.searchParams.get('id')])[1];
+  if (drive) return { type: 'drive', embed: `https://drive.google.com/file/d/${drive}/preview` };
+  if (/\.(mp4|webm|m4v|mov)$/i.test(u.pathname)) return { type: 'direct', src: url };
+  return { type: 'other', url };
+}
+
+function playBadge() {
+  return Object.assign(document.createElement('span'), { className: 'play-badge', ariaHidden: 'true' });
+}
 
 function placeDoc(el, d) {
   el.style.left = d.x + '%';
@@ -234,6 +262,27 @@ function buildDoc(d) {
     img.loading = 'lazy';
     img.draggable = false;
     body.appendChild(img);
+  } else if (isVideo(d)) {
+    body.classList.add('has-media');
+    const frame = document.createElement('div');
+    frame.className = 'video-frame';
+    const link = d.kind === 'link' ? videoLink(d.url) : null;
+    if (!link) { // archivo de video: se muestra el primer cuadro
+      const v = document.createElement('video');
+      v.src = d.file + '#t=0.5';
+      v.muted = true;
+      v.preload = 'metadata';
+      v.playsInline = true;
+      frame.appendChild(v);
+    } else if (link.thumb) {
+      const thumb = Object.assign(document.createElement('img'), { src: link.thumb, alt: '', loading: 'lazy', draggable: false });
+      thumb.addEventListener('error', () => { thumb.remove(); frame.classList.add('film'); }); // sin miniatura: rollo de película
+      frame.appendChild(thumb);
+    } else {
+      frame.classList.add('film');
+    }
+    frame.appendChild(playBadge());
+    body.appendChild(frame);
   } else {
     body.appendChild(fileCard(d));
     if (isPdf(d)) renderPdfThumb(d.file, el, body);
@@ -352,6 +401,7 @@ function openLightbox(d) {
   content.replaceChildren();
   const dl = $('lbDownload');
   dl.classList.add('hidden');
+  dl.textContent = 'Abrir original';
 
   if (d.kind === 'text') {
     const paper = document.createElement('div');
@@ -361,6 +411,29 @@ function openLightbox(d) {
     content.appendChild(paper);
   } else if (isImage(d)) {
     content.appendChild(Object.assign(document.createElement('img'), { src: d.file, alt: d.title || '' }));
+  } else if (isVideo(d)) {
+    const link = d.kind === 'link' ? videoLink(d.url) : { type: 'file', src: d.file };
+    if (link.embed) {
+      content.appendChild(Object.assign(document.createElement('iframe'), {
+        className: 'lb-video',
+        src: link.embed,
+        title: d.title || 'Video',
+        allow: 'autoplay; fullscreen; picture-in-picture; encrypted-media',
+        allowFullscreen: true,
+      }));
+    } else if (link.src) {
+      content.appendChild(Object.assign(document.createElement('video'), {
+        className: 'lb-video', src: link.src, controls: true, autoplay: true, playsInline: true,
+      }));
+    } else {
+      dl.href = d.url;
+      dl.textContent = 'Abrir video';
+      dl.classList.remove('hidden');
+      const paper = document.createElement('div');
+      paper.className = 'lb-paper';
+      paper.appendChild(Object.assign(document.createElement('div'), { className: 'doc-text', textContent: 'Este video se abre en otra pestaña: tocá "Abrir video".' }));
+      content.appendChild(paper);
+    }
   } else if (isPdf(d)) {
     const pages = Object.assign(document.createElement('div'), { className: 'lb-pages' });
     content.appendChild(pages);

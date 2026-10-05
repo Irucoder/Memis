@@ -122,6 +122,7 @@ document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('cli
   document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('active', x === b));
   $('fileField').classList.toggle('hidden', kind !== 'file');
   $('textField').classList.toggle('hidden', kind !== 'text');
+  $('linkField').classList.toggle('hidden', kind !== 'link');
 }));
 
 document.querySelectorAll('input[name=when]').forEach((r) => r.addEventListener('change', () => {
@@ -158,6 +159,7 @@ async function uploadFile(file, meta) {
   const toSend = await shrinkImage(file, limit);
   if (toSend.size > limit) {
     const mb = (limit / 1024 / 1024).toFixed(1);
+    if (file.type.startsWith('video/')) throw new Error(`"${file.name}" pesa más de ${mb} MB. Subilo a YouTube (oculto) o Google Drive y cargalo con "Video por link".`);
     throw new Error(`"${file.name}" pesa más de ${mb} MB. Comprimilo y volvé a intentar.`);
   }
   const r = await fetch('/api/admin/docs', {
@@ -195,6 +197,10 @@ $('uploadForm').addEventListener('submit', async (e) => {
   if (kind === 'text') {
     if (!$('fText').value.trim()) return toast('Escribí el texto del documento');
     jobs.push({ ...common, title, text: $('fText').value });
+  } else if (kind === 'link') {
+    const url = $('fUrl').value.trim();
+    if (!/^https:\/\//i.test(url)) return toast('Pegá el link completo del video (empieza con https://)');
+    jobs.push({ ...common, title: title || 'Video', url });
   } else {
     const files = [...$('fFile').files];
     if (!files.length) return toast('Elegí al menos un archivo');
@@ -283,7 +289,7 @@ function docItem(d) {
 
   const thumb = item.querySelector('.thumb');
   if (d.mime && d.mime.startsWith('image/')) thumb.appendChild(Object.assign(document.createElement('img'), { src: d.file, alt: '' }));
-  else thumb.textContent = d.kind === 'text' ? 'TEXTO' : (d.mime === 'application/pdf' ? 'PDF' : 'ARCHIVO');
+  else thumb.textContent = d.kind === 'text' ? 'TEXTO' : d.kind === 'link' || (d.mime && d.mime.startsWith('video/')) ? 'VIDEO' : (d.mime === 'application/pdf' ? 'PDF' : 'ARCHIVO');
 
   const q = (f) => item.querySelector(`[data-f="${f}"]`);
   q('title').value = d.title;
@@ -331,8 +337,8 @@ function docItem(d) {
     pub.addEventListener('click', () => patch(d.id, { publishAt: null }));
     btns.appendChild(pub);
   }
-  if (d.file) {
-    btns.appendChild(Object.assign(document.createElement('a'), { className: 'btn small ghost', href: d.file, target: '_blank', rel: 'noopener', textContent: 'Ver archivo' }));
+  if (d.file || d.url) {
+    btns.appendChild(Object.assign(document.createElement('a'), { className: 'btn small ghost', href: d.file || d.url, target: '_blank', rel: 'noopener', textContent: d.url ? 'Ver video' : 'Ver archivo' }));
   }
   const del = Object.assign(document.createElement('button'), { className: 'btn small danger', type: 'button', textContent: 'Eliminar' });
   del.addEventListener('click', async () => {
