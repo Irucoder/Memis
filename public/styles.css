@@ -363,9 +363,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   container-type: inline-size;
   /* proporción fija (un poco más ancha que la foto) y entra completo en la pantalla,
      debajo de la lámpara: el alto disponible manda */
-  aspect-ratio: 2.2;
-  width: min(100%, calc((100vh - 240px) * 2.2));
-  width: min(100%, calc((100dvh - 240px) * 2.2));
+  aspect-ratio: 1.9;
+  width: min(100%, calc((100vh - 240px) * 1.9));
+  width: min(100%, calc((100dvh - 240px) * 1.9));
   min-width: 860px;
   margin: 0 auto;
   /* el marco sale de la foto (bordes, sin deformar las esquinas) y el corcho va aparte,
