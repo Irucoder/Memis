@@ -105,6 +105,7 @@
       mix-blend-mode: multiply;
     }
     .denied.show { animation: stamp 2.4s ease-out forwards; }
+    .denied.stay { opacity: 0.85; transform: translate(-50%, -50%) rotate(-9deg) scale(1); font-size: 0.85cqw; }
     @keyframes stamp {
       0% { opacity: 0; transform: translate(-50%, -50%) rotate(-9deg) scale(1.6); }
       12% { opacity: 0.85; transform: translate(-50%, -50%) rotate(-9deg) scale(1); }
@@ -149,6 +150,21 @@
       input.focus();
     });
 
+    // Si el tablero o el panel nos mandaron de vuelta, contar por qué
+    const MOTIVOS = {
+      'sin-cookie': 'El navegador no guardó la sesión',
+      firma: 'La sesión no se reconoció',
+      vencida: 'La sesión venció',
+      ilegible: 'La sesión estaba dañada',
+    };
+    const salida = new URLSearchParams(location.search).get('salida');
+    if (salida) {
+      history.replaceState(null, '', '/');
+      denied.textContent = (MOTIVOS[salida] || 'Se cerró la sesión') + ' · ingresá de nuevo';
+      denied.classList.add('stay');
+      console.warn('Volviste a la portada. Motivo:', salida);
+    }
+
     let busy = false;
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -169,7 +185,7 @@
         if (err.detail || err.name === 'TypeError') console.error('Ingreso:', err.detail || err.message);
         denied.textContent = err.message === 'Acceso denegado' ? 'Acceso denegado' : 'Falla del servidor · probá de nuevo';
         for (const el of [slot, denied]) {
-          el.classList.remove('shake', 'show');
+          el.classList.remove('shake', 'show', 'stay');
           void el.offsetWidth;
         }
         slot.classList.add('shake');

@@ -23,7 +23,10 @@ async function api(method, url, body) {
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (r.status === 401) location.replace('/');
+  if (r.status === 401) {
+    location.replace('/?salida=' + ((await r.clone().json().catch(() => ({}))).reason || 'sesion'));
+    return new Promise(() => {}); // la página se va: no seguir
+  }
   if (r.status === 403) location.replace('/tablero');
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data.error || 'Error ' + r.status);
@@ -165,7 +168,10 @@ async function uploadFile(file, meta) {
     },
     body: toSend,
   });
-  if (r.status === 401) location.replace('/');
+  if (r.status === 401) {
+    location.replace('/?salida=' + ((await r.clone().json().catch(() => ({}))).reason || 'sesion'));
+    return new Promise(() => {}); // la página se va: no seguir
+  }
   const data = await r.json().catch(() => ({}));
   if (r.status === 413) throw new Error(`"${file.name}" es demasiado grande. Comprimilo y volvé a intentar.`);
   if (!r.ok) throw new Error(data.error || 'Error ' + r.status);

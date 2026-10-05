@@ -69,7 +69,7 @@ async function load() {
   let s;
   try {
     const r = await fetch('/api/state', { credentials: 'same-origin' });
-    if (r.status === 401) return location.replace('/');
+    if (r.status === 401) return location.replace('/?salida=' + ((await r.json().catch(() => ({}))).reason || 'sesion'));
     s = await r.json();
   } catch {
     return; // sin conexión: se reintenta en el próximo ciclo
