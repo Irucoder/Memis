@@ -667,10 +667,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   font-size: 1.15cqw;
   line-height: 1.05;
   color: #2a2418;
-  word-break: break-word;
+  overflow-wrap: normal;
   overflow: hidden;
   max-height: 100%;
 }
+.note-text { display: block; width: 100%; }
 .note-input {
   width: 100%;
   height: 100%;

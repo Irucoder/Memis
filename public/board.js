@@ -535,6 +535,41 @@ function buildNote(n) {
   return el;
 }
 
+// La letra se achica hasta que entre todo el texto en el post-it
+function fitNoteText(el) {
+  const t = el.querySelector('.note-input') || el.querySelector('.note-text');
+  if (!t) return;
+  t.style.fontSize = '';
+  t.style.wordBreak = '';
+  const cs = getComputedStyle(el);
+  const avail = el.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const base = parseFloat(getComputedStyle(t).fontSize);
+  const overflows = () => t.scrollHeight > avail + 1 || t.scrollWidth > t.clientWidth + 1;
+  const shrink = (limit) => {
+    let size = base;
+    t.style.fontSize = '';
+    while (overflows() && size > base * limit) {
+      size *= 0.92;
+      t.style.fontSize = size + 'px';
+    }
+  };
+  shrink(0.55);
+  if (overflows()) { // una palabra larguísima: se parte en renglones y se vuelve a ajustar
+    t.style.wordBreak = 'break-word';
+    shrink(0.35);
+  }
+}
+
+function refitNotes() {
+  notesMap.forEach((r) => fitNoteText(r.el));
+}
+let refitTimer = null;
+window.addEventListener('resize', () => {
+  clearTimeout(refitTimer);
+  refitTimer = setTimeout(refitNotes, 150);
+});
+if (document.fonts) document.fonts.ready.then(refitNotes); // la letra manuscrita cambia las medidas
+
 function showNotes(list) {
   if (dragging) return;
   const board = $('board');
@@ -549,6 +584,7 @@ function showNotes(list) {
     else board.appendChild(el);
     const entry = { el, sig, doc: { ...n, w: NOTE_W }, type: 'note' };
     notesMap.set(n.id, entry);
+    fitNoteText(el);
     keepInside(entry);
   }
   for (const [id, r] of notesMap) {
@@ -581,6 +617,8 @@ function editNote(r, isNew = false) {
   input.placeholder = 'Escribí…';
   textEl.replaceWith(input);
   r.el.classList.add('editing');
+  fitNoteText(r.el);
+  input.addEventListener('input', () => fitNoteText(r.el));
   input.focus();
   input.select();
 
@@ -591,10 +629,12 @@ function editNote(r, isNew = false) {
     const text = input.value.replace(/\s+/g, ' ').trim();
     input.replaceWith(textEl);
     r.el.classList.remove('editing');
+    fitNoteText(r.el);
     editingNote = null;
     if (save && !text && isNew) return removeNote(r, false);
     if (!save || text === r.doc.text || !text) return;
     textEl.textContent = text;
+    fitNoteText(r.el);
     r.doc.text = text;
     r.sig = JSON.stringify({ ...r.doc, w: undefined });
     try {
