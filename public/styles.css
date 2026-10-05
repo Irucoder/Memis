@@ -820,6 +820,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .threads .t-line { fill: none; stroke: #b4222c; stroke-linecap: round; }
 .threads .t-hi { fill: none; stroke: rgba(255, 150, 150, 0.35); stroke-linecap: round; }
 .threads .t-hit { fill: none; stroke: transparent; pointer-events: stroke; cursor: pointer; }
+/* mientras se ata un hilo, los que ya están no tapan las pistas (si no, no se podía
+   atar un segundo hilo tocando la chinche de una pista que ya tenía uno) */
+.board.threading .threads .t-hit { pointer-events: none; }
 .threads g:hover .t-line { stroke: #de3a44; }
 .threads .t-draft { fill: none; stroke: #b4222c; stroke-linecap: round; stroke-dasharray: 6 5; opacity: 0.85; }
 .threads .knot { fill: #8e1820; }
