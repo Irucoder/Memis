@@ -225,6 +225,17 @@ function newTag() {
   return Object.assign(document.createElement('span'), { className: 'new-tag', textContent: 'Nuevo' });
 }
 
+// "sáb 11/10 · 21:35 hs": cuándo se activa una carpeta por venir
+function whenText(iso) {
+  if (!iso) return 'Próximamente';
+  const d = new Date(iso);
+  const weekday = new Intl.DateTimeFormat('es-AR', { weekday: 'short' }).format(d).replace('.', '');
+  const day = `${weekday} ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const time = new Intl.DateTimeFormat('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }).format(d);
+  return `${day} · ${time}\u00a0hs`; // "hs" nunca queda sola en otro renglón
+}
+const pendingToast = (d) => toast(d.publishAt ? `Esta carpeta se activa el ${whenText(d.publishAt)}` : 'Esta carpeta todavía no se abrió…');
+
 function playBadge() {
   return Object.assign(document.createElement('span'), { className: 'play-badge', ariaHidden: 'true' });
 }
@@ -254,7 +265,10 @@ function buildDoc(d) {
     el.classList.add('pending');
     el.setAttribute('aria-label', 'Documento aún no revelado');
     body.classList.add('s-' + (d.style || 'papel'));
-    body.innerHTML = '<span class="q">?</span>';
+    // Carpeta cerrada con la fecha en que se activa
+    body.innerHTML = '<span class="pf-tab"></span><span class="pf-stamp">Confidencial</span><span class="pf-q">?</span><span class="pf-when"><small>Se activa el</small><b></b></span>';
+    body.querySelector('.pf-when b').textContent = whenText(d.publishAt);
+    el.setAttribute('aria-label', 'Carpeta que se activa el ' + whenText(d.publishAt));
     return el;
   }
 
@@ -582,7 +596,7 @@ $('board').addEventListener('click', (e) => {
   if (!r) return;
   if (r.type === 'note') return editNote(r);
   if (r.doc.locked) return openUnlock(r.doc);
-  if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
+  if (r.doc.pending && !r.doc.kind) return pendingToast(r.doc);
   openLightbox(r.doc);
 });
 
@@ -595,7 +609,7 @@ $('board').addEventListener('keydown', (e) => {
   if (threading) return pickThreadEnd(r);
   if (r.type === 'note') return editNote(r);
   if (r.doc.locked) return openUnlock(r.doc);
-  if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
+  if (r.doc.pending && !r.doc.kind) return pendingToast(r.doc);
   openLightbox(r.doc);
 });
 
@@ -720,7 +734,7 @@ function archiveThumb(d) {
   box.className = 'archive-thumb';
   if (d.pending && !d.kind) {
     box.classList.add('unknown');
-    box.textContent = '?';
+    box.innerHTML = '<span class="pf-tab"></span><span class="pf-q">?</span>';
   } else if (d.locked) {
     box.classList.add('sealed-thumb');
     box.innerHTML = '<span class="wax">' + LOCK_SVG + '</span>';
@@ -779,7 +793,7 @@ function showArchive(docs) {
     if (d.isNew && !unknown) card.appendChild(newTag());
     card.appendChild(Object.assign(document.createElement('div'), {
       className: 'archive-title',
-      textContent: unknown ? 'Todavía no revelado' : d.locked ? 'Pista bloqueada' : d.title || d.caption || 'Sin título',
+      textContent: unknown ? 'Se activa el ' + whenText(d.publishAt) : d.locked ? 'Pista bloqueada' : d.title || d.caption || 'Sin título',
     }));
     if (!unknown) {
       const actions = document.createElement('div');
@@ -1101,7 +1115,7 @@ $('spool').addEventListener('click', () => {
 });
 
 async function pickThreadEnd(r) {
-  if (r.doc.pending && !r.doc.kind) return toast('Esa pista todavía no fue revelada…');
+  if (r.doc.pending && !r.doc.kind) return pendingToast(r.doc);
   if (!threadFrom) {
     threadFrom = r.doc.id;
     r.el.classList.add('thread-from');

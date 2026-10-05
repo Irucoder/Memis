@@ -601,26 +601,74 @@ button, input, select, textarea { font: inherit; color: inherit; }
   transform: rotate(-8deg);
 }
 
-/* Silueta: documento por venir */
-.doc.pending { cursor: help; filter: none; }
-.doc.pending:hover { filter: none; transform: translate(-50%, -51%) rotate(calc(var(--rot) + 0.8deg)) scale(1.02); }
+/* Por venir: carpeta cerrada que dice cuándo se activa */
+.doc.pending { cursor: help; filter: drop-shadow(0 0.6cqw 0.7cqw rgba(0, 0, 0, 0.45)); }
+.doc.pending:hover { transform: translate(-50%, -51%) rotate(calc(var(--rot) + 0.8deg)) scale(1.03); }
 .doc.pending .doc-body {
-  aspect-ratio: 8.5 / 11;
-  border: 0.2cqw dashed rgba(60, 35, 15, 0.55);
-  background: rgba(40, 22, 8, 0.16);
+  position: relative;
+  aspect-ratio: 5 / 4;
+  margin-top: 1.1cqw; /* lugar para la pestaña */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5cqw;
+  padding: 0.8cqw;
+  border-radius: 0 0.3cqw 0.3cqw 0.3cqw;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 35%),
+    linear-gradient(165deg, #c9a265, #a97f45);
+  box-shadow: inset 0 0 0 0.12cqw rgba(80, 50, 15, 0.35);
+}
+.doc.pending .pf-tab {
+  position: absolute;
+  left: 0; top: -1.1cqw;
+  width: 40%; height: 1.2cqw;
+  border-radius: 0.3cqw 0.3cqw 0 0;
+  background: linear-gradient(180deg, #d1ab6e, #c9a265);
+  box-shadow: inset 0 0.12cqw 0 rgba(255, 255, 255, 0.2);
+}
+.doc.pending .pf-stamp {
+  position: absolute;
+  top: 0.7cqw; right: 0.7cqw;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 0.55cqw;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(140, 25, 25, 0.75);
+  border: 0.1cqw solid rgba(140, 25, 25, 0.6);
+  padding: 0.05cqw 0.3cqw;
+  transform: rotate(8deg);
+}
+.doc.pending .pf-q {
   display: grid;
   place-items: center;
-  border-radius: 0.2cqw;
-}
-.doc.pending .q {
+  width: 3cqw;
+  height: 3cqw;
+  border-radius: 50%;
+  border: 0.18cqw solid rgba(60, 35, 10, 0.55);
   font-family: var(--font-type);
-  font-size: 6cqw;
+  font-size: 2cqw;
   line-height: 1;
-  color: rgba(55, 32, 12, 0.6);
-  text-shadow: 0 0.1cqw 0 rgba(255, 230, 190, 0.25);
+  color: rgba(60, 35, 10, 0.7);
 }
-.doc.pending .doc-body.s-polaroid, .doc.pending .doc-body.s-foto { aspect-ratio: 4 / 5; }
-.doc.pending .doc-body.s-nota { aspect-ratio: 1; }
+.doc.pending .pf-when {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.25cqw 0.6cqw;
+  background: #f4efe2;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  box-shadow: 0 0.1cqw 0.25cqw rgba(0, 0, 0, 0.3);
+  transform: rotate(-1.5deg);
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.2;
+}
+.doc.pending .pf-when small { font-size: 0.5cqw; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft); }
+.doc.pending .pf-when b { font-size: 0.72cqw; letter-spacing: 0.02em; }
 
 /* Vista de admin: documento programado */
 .doc .sched-badge {
@@ -1101,7 +1149,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .archive-thumb.paper .doc-text { font-size: 10px; max-height: none; }
 .archive-thumb.paper.big { place-items: center; font-size: clamp(24px, 18cqw, 56px); text-align: center; line-height: 1.1; }
 .archive-thumb.nota { background: #e8d44d; }
-.archive-thumb.unknown { background: rgba(60, 35, 10, 0.15); border: 2px dashed rgba(60, 35, 10, 0.45); color: rgba(60, 35, 10, 0.6); font-family: var(--font-type); font-size: 44px; }
+.archive-thumb.unknown { background: linear-gradient(165deg, #c9a265, #a97f45); overflow: visible; margin-top: 10px; border-radius: 0 4px 4px 4px; }
+.archive-thumb.unknown .pf-tab { position: absolute; left: 0; top: -10px; width: 40%; height: 11px; border-radius: 4px 4px 0 0; background: #d1ab6e; }
+.archive-thumb.unknown .pf-q { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 50%; border: 2px solid rgba(60, 35, 10, 0.55); font-family: var(--font-type); font-size: 30px; color: rgba(60, 35, 10, 0.7); }
 .archive-thumb.film {
   background:
     repeating-linear-gradient(90deg, #e9e4d6 0 6%, transparent 6% 12%) top / 100% 8% no-repeat,
