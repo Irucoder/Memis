@@ -643,6 +643,115 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .board.editing .doc:hover .doc-body { animation: none; }
 .board.editing { outline: 1px dashed rgba(241, 230, 74, 0.35); outline-offset: 8px; }
 
+/* ---------- Pistas con clave ---------- */
+
+.doc.sealed .doc-body.seal-body { /* gana sobre el estilo de la pista (polaroid, papel…) */
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 30%),
+    linear-gradient(160deg, #d7b57c, #b98f55);
+  clip-path: none;
+}
+.seal-body {
+  aspect-ratio: 8.5 / 11;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.7cqw;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), transparent 30%),
+    linear-gradient(160deg, #d7b57c, #b98f55);
+  overflow: hidden;
+}
+.seal-body .seal-stamp, .lb-lock .seal-stamp {
+  font-family: var(--font-mono);
+  font-weight: bold;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(150, 25, 25, 0.8);
+  border: 0.15cqw solid rgba(150, 25, 25, 0.7);
+  padding: 0.15cqw 0.5cqw;
+  transform: rotate(-8deg);
+  font-size: 0.75cqw;
+}
+.wax {
+  display: grid;
+  place-items: center;
+  width: 3.4cqw;
+  height: 3.4cqw;
+  border-radius: 50%;
+  color: #f3dcc0;
+  background: radial-gradient(circle at 35% 30%, #d4454a, #9b1c22 55%, #6a0f14);
+  box-shadow: 0 0.25cqw 0.5cqw rgba(0, 0, 0, 0.45), inset 0 0 0 0.25cqw rgba(0, 0, 0, 0.12);
+}
+.wax svg { width: 55%; height: 55%; }
+.seal-label { font-family: var(--font-type); font-size: 0.85cqw; color: #3d2b13; letter-spacing: 0.1em; text-transform: uppercase; }
+.lock-badge {
+  position: absolute;
+  top: -0.6cqw; right: -0.6cqw;
+  z-index: 3;
+  width: 1.8cqw; height: 1.8cqw;
+  min-width: 20px; min-height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #11202e;
+  border: 1px solid rgba(241, 230, 74, 0.5);
+  font-size: max(11px, 0.9cqw);
+}
+.archive-thumb.sealed-thumb { background: linear-gradient(160deg, #d7b57c, #b98f55); }
+.archive-thumb.sealed-thumb .wax { width: 54px; height: 54px; }
+
+.lb-lock {
+  width: min(460px, 92vw);
+  padding: 36px 32px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+  background:
+    radial-gradient(ellipse at 30% 0%, rgba(255, 255, 255, 0.22), transparent 50%),
+    linear-gradient(165deg, #dcb87a, #c49a5c);
+  color: var(--ink);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+}
+.lb-lock .seal-stamp { font-size: 12px; border-width: 2px; padding: 3px 10px; }
+.lb-lock .wax.big { width: 76px; height: 76px; transition: transform 0.5s; }
+.lb-lock h2 { margin: 4px 0 0; font-family: var(--font-type); font-weight: normal; font-size: 24px; letter-spacing: 0.06em; }
+.lb-lock .lock-hint {
+  margin: 0;
+  padding: 12px 14px;
+  width: 100%;
+  background: rgba(255, 252, 240, 0.75);
+  font-family: var(--font-type);
+  font-size: 16px;
+  line-height: 1.45;
+  box-shadow: inset 0 0 0 1px rgba(60, 35, 10, 0.2);
+}
+.lb-lock .lock-label { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #3d2b13; }
+.lb-lock input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 3px;
+  background: #1a1a18;
+  color: #f2eee2;
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 0.25em;
+  text-align: center;
+  text-transform: uppercase;
+  outline: none;
+}
+.lb-lock input:focus { box-shadow: 0 0 0 3px rgba(155, 28, 34, 0.5); }
+.lb-lock .btn { width: 100%; }
+.lb-lock .lock-error { min-height: 18px; font-family: var(--font-mono); font-size: 14px; color: #8e1418; font-weight: bold; }
+.lb-lock.shake { animation: lockshake 0.45s; }
+@keyframes lockshake { 20% { transform: translateX(-10px); } 40% { transform: translateX(9px); } 60% { transform: translateX(-6px); } 80% { transform: translateX(4px); } }
+.lb-lock.opened .wax.big { transform: rotate(-20deg) scale(1.15); background: radial-gradient(circle at 35% 30%, #6fcf86, #2f8a48 55%, #1c5a2e); }
+
 /* ---------- Hilos ---------- */
 
 .threads {

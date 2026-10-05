@@ -167,6 +167,22 @@
           </div>
         </div>
         <div class="field">
+          <label class="switch" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--text)">
+            <input type="checkbox" id="fLock">
+            <span>🔒 Bloquear con clave: los jugadores ven la pista cerrada hasta que escriben la clave</span>
+          </label>
+        </div>
+        <div class="grid2 hidden" id="lockFields">
+          <div class="field">
+            <label for="fLockKey">Clave</label>
+            <input type="text" id="fLockKey" placeholder="Ej: JARDINERO" autocomplete="off">
+          </div>
+          <div class="field">
+            <label for="fLockHint">Texto que ve el jugador</label>
+            <input type="text" id="fLockHint" placeholder="Ej: Esta clave se desbloquea con la pista de la cámara 3">
+          </div>
+        </div>
+        <div class="field">
           <span class="lbl">Aparición</span>
           <div class="radio-row">
             <label><input type="radio" name="when" value="now" checked> Publicar ahora</label>

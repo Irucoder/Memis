@@ -217,6 +217,8 @@ function videoLink(url) {
   return { type: 'other', url };
 }
 
+const LOCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="4.5" y="10" width="15" height="11" rx="2" fill="currentColor"/><circle cx="12" cy="15.2" r="1.6" fill="#7a1418"/><path d="M12 16.4v2" stroke="#7a1418" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
 function playBadge() {
   return Object.assign(document.createElement('span'), { className: 'play-badge', ariaHidden: 'true' });
 }
@@ -247,6 +249,15 @@ function buildDoc(d) {
     el.setAttribute('aria-label', 'Documento aún no revelado');
     body.classList.add('s-' + (d.style || 'papel'));
     body.innerHTML = '<span class="q">?</span>';
+    return el;
+  }
+
+  if (d.locked) { // pista con clave, todavía cerrada: solo la forma y el candado
+    el.classList.add('sealed');
+    el.setAttribute('aria-label', 'Pista bloqueada con clave');
+    el.appendChild(Object.assign(document.createElement('span'), { className: 'pin' }));
+    body.classList.add('seal-body');
+    body.innerHTML = '<span class="seal-stamp">Clasificado</span><span class="wax">' + LOCK_SVG + '</span><span class="seal-label">Bloqueada</span>';
     return el;
   }
 
@@ -294,6 +305,9 @@ function buildDoc(d) {
     body.appendChild(Object.assign(document.createElement('div'), { className: 'doc-caption', textContent: d.caption || d.title || '' }));
   }
 
+  if (d.sealed) { // vista admin: tiene clave y nadie la abrió todavía
+    el.appendChild(Object.assign(document.createElement('span'), { className: 'lock-badge', textContent: '🔒' }));
+  }
   if (d.pending) { // vista admin: programado
     el.classList.add('is-scheduled');
     const badge = document.createElement('span');
@@ -465,6 +479,71 @@ function openLightbox(d) {
   $('lbClose').focus();
 }
 
+// ---------- Desbloquear una pista con clave ----------
+
+function openUnlock(d) {
+  const content = $('lbContent');
+  content.replaceChildren();
+  $('lbDownload').classList.add('hidden');
+  const mv = $('lbMove');
+  mv.classList.remove('hidden');
+  mv.textContent = d.folder ? '📌 Pasar al tablero' : '🗂 Guardar en el archivo';
+  mv.onclick = async () => {
+    closeLightbox();
+    await moveDoc(d.id, !d.folder);
+  };
+
+  const box = document.createElement('form');
+  box.className = 'lb-lock';
+  box.autocomplete = 'off';
+  box.innerHTML = `
+    <span class="seal-stamp">Clasificado</span>
+    <span class="wax big">${LOCK_SVG}</span>
+    <h2>Pista bloqueada</h2>
+    <p class="lock-hint"></p>
+    <label class="lock-label" for="unlockInput">Ingresá la clave para desbloquear este documento</label>
+    <input id="unlockInput" type="text" spellcheck="false" autocapitalize="characters" autocomplete="off" required>
+    <button class="btn" type="submit">Desbloquear</button>
+    <div class="lock-error" role="alert"></div>`;
+  box.querySelector('.lock-hint').textContent = d.hint || 'Esta pista está protegida con una clave.';
+  content.appendChild(box);
+  lightbox.classList.add('open');
+  const input = box.querySelector('input');
+  const error = box.querySelector('.lock-error');
+  setTimeout(() => input.focus(), 50);
+
+  box.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = box.querySelector('button');
+    btn.disabled = true;
+    error.textContent = '';
+    try {
+      const res = await fetch('/api/unlock/' + d.id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: input.value }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'No se pudo desbloquear');
+      box.classList.add('opened');
+      box.querySelector('h2').textContent = '¡Desbloqueada!';
+      await new Promise((r) => setTimeout(r, 900));
+      await load();
+      const opened = (rendered.get(d.id) || {}).doc || archiveDocs.find((x) => x.id === d.id);
+      if (opened && !opened.locked) openLightbox(opened);
+      else closeLightbox();
+    } catch (err) {
+      error.textContent = err.message;
+      box.classList.remove('shake');
+      void box.offsetWidth;
+      box.classList.add('shake');
+      input.select();
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
 function closeLightbox() {
   lightbox.classList.remove('open');
   $('lbContent').replaceChildren();
@@ -494,6 +573,7 @@ $('board').addEventListener('click', (e) => {
   if (threading) return r && pickThreadEnd(r);
   if (!r) return;
   if (r.type === 'note') return editNote(r);
+  if (r.doc.locked) return openUnlock(r.doc);
   if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
   openLightbox(r.doc);
 });
@@ -506,6 +586,7 @@ $('board').addEventListener('keydown', (e) => {
   e.preventDefault();
   if (threading) return pickThreadEnd(r);
   if (r.type === 'note') return editNote(r);
+  if (r.doc.locked) return openUnlock(r.doc);
   if (r.doc.pending && !r.doc.kind) return toast('Este documento todavía no fue revelado…');
   openLightbox(r.doc);
 });
@@ -632,6 +713,9 @@ function archiveThumb(d) {
   if (d.pending && !d.kind) {
     box.classList.add('unknown');
     box.textContent = '?';
+  } else if (d.locked) {
+    box.classList.add('sealed-thumb');
+    box.innerHTML = '<span class="wax">' + LOCK_SVG + '</span>';
   } else if (d.kind === 'text' && d.text.trim().length <= 12) { // letras o palabras sueltas: bien grandes
     box.classList.add('paper', 'big');
     if (d.style === 'nota') box.classList.add('nota');
@@ -684,13 +768,14 @@ function showArchive(docs) {
     card.appendChild(archiveThumb(d));
     card.appendChild(Object.assign(document.createElement('div'), {
       className: 'archive-title',
-      textContent: unknown ? 'Todavía no revelado' : d.title || d.caption || 'Sin título',
+      textContent: unknown ? 'Todavía no revelado' : d.locked ? 'Pista bloqueada' : d.title || d.caption || 'Sin título',
     }));
     if (!unknown) {
       const actions = document.createElement('div');
       actions.className = 'archive-actions';
       const view = Object.assign(document.createElement('button'), { className: 'btn small dark', type: 'button', textContent: 'Ver' });
-      view.addEventListener('click', () => openLightbox(d));
+      if (d.locked) view.textContent = 'Abrir';
+      view.addEventListener('click', () => (d.locked ? openUnlock(d) : openLightbox(d)));
       const pin = Object.assign(document.createElement('button'), { className: 'btn small', type: 'button', textContent: 'Al tablero' });
       pin.addEventListener('click', async () => {
         pin.disabled = true;

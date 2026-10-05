@@ -125,6 +125,8 @@ document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('cli
   $('linkField').classList.toggle('hidden', kind !== 'link');
 }));
 
+$('fLock').addEventListener('change', () => $('lockFields').classList.toggle('hidden', !$('fLock').checked));
+
 document.querySelectorAll('input[name=when]').forEach((r) => r.addEventListener('change', () => {
   const later = document.querySelector('input[name=when]:checked').value === 'later';
   $('fPublishAt').disabled = !later;
@@ -192,6 +194,11 @@ $('uploadForm').addEventListener('submit', async (e) => {
     publishAt: later ? fromLocalInput($('fPublishAt').value) : null,
   };
   if ($('fStyle').value !== 'auto') common.style = $('fStyle').value;
+  if ($('fLock').checked) {
+    if (!$('fLockKey').value.trim()) return toast('Escribí la clave para desbloquear la pista');
+    common.lockKey = $('fLockKey').value.trim();
+    common.lockHint = $('fLockHint').value.trim();
+  }
   const title = $('fTitle').value.trim();
 
   const jobs = [];
@@ -221,6 +228,7 @@ $('uploadForm').addEventListener('submit', async (e) => {
     }
     toast(jobs.length > 1 ? `${jobs.length} documentos cargados` : 'Documento cargado');
     $('uploadForm').reset();
+    $('lockFields').classList.add('hidden');
     $('fPublishAt').disabled = true;
     await load();
   } catch (err) {
@@ -286,6 +294,10 @@ function docItem(d) {
         <div class="field"><label>Rotación (°)</label><input type="number" data-f="rot" min="-45" max="45" step="0.5"></div>
       </div>
       <div class="field" style="margin-top:8px"><label>Epígrafe</label><input type="text" data-f="caption"></div>
+      <div class="controls" style="margin-top:8px">
+        <div class="field"><label>🔒 Clave (vacío = sin clave)</label><input type="text" data-f="lockKey" autocomplete="off"></div>
+        <div class="field" style="grid-column: span 2"><label>Texto que ve el jugador</label><input type="text" data-f="lockHint"></div>
+      </div>
       <div class="btns"></div>
     </div>`;
 
@@ -296,6 +308,8 @@ function docItem(d) {
   const q = (f) => item.querySelector(`[data-f="${f}"]`);
   q('title').value = d.title;
   q('caption').value = d.caption;
+  q('lockKey').value = d.lockKey || '';
+  q('lockHint').value = d.lockHint || '';
   q('publishAt').value = toLocalInput(d.publishAt);
   q('w').value = d.w;
   q('rot').value = d.rot;
@@ -313,6 +327,12 @@ function docItem(d) {
   } else {
     pill.className = 'pill live';
     pill.textContent = d.folder ? 'Publicado · en el archivo' : 'Publicado · en el tablero';
+  }
+  if (d.hasLock) {
+    const lockPill = document.createElement('span');
+    lockPill.className = 'pill ' + (d.sealed ? 'sched' : 'live');
+    lockPill.textContent = d.sealed ? '🔒 Bloqueada' : '🔓 Desbloqueada';
+    pill.after(lockPill);
   }
 
   item.querySelectorAll('[data-f]').forEach((input) => input.addEventListener('change', () => {
@@ -335,6 +355,11 @@ function docItem(d) {
       edit.remove();
     });
     btns.appendChild(edit);
+  }
+  if (d.hasLock && !d.sealed) {
+    const relock = Object.assign(document.createElement('button'), { className: 'btn small dark', type: 'button', textContent: '🔒 Volver a bloquear' });
+    relock.addEventListener('click', () => patch(d.id, { relock: true }));
+    btns.appendChild(relock);
   }
   if (d.pending) {
     const pub = Object.assign(document.createElement('button'), { className: 'btn small', type: 'button', textContent: 'Publicar ya' });
