@@ -16,9 +16,18 @@ let threadFrom = null; // id del documento donde se ató la primera punta
 const rendered = new Map(); // id -> { el, sig, doc }
 const notesMap = new Map(); // id -> { el, sig, doc: nota, type: 'note' }
 
-// Marco del corcho, en % del tablero: nada se puede ubicar encima de la madera
-const FRAME_X = 3.8;
-const FRAME_Y = 5.6;
+// Margen dentro del corcho, en %: nada se puede ubicar encima de la madera
+const FRAME_X = 0.6;
+const FRAME_Y = 1;
+
+// Zona del corcho en pantalla (sin el marco), que es donde se ubican pistas e hilos
+function corkBox() {
+  const b = $('board');
+  const r = b.getBoundingClientRect();
+  const left = r.left + b.clientLeft;
+  const top = r.top + b.clientTop;
+  return { left, top, width: b.clientWidth, height: b.clientHeight, right: left + b.clientWidth, bottom: top + b.clientHeight };
+}
 
 function fitInside(r, x, y) {
   const board = $('board');
@@ -466,7 +475,7 @@ $('board').addEventListener('pointermove', (e) => {
   const { r, startX, startY, x0, y0 } = pressed;
   if (!dragging) {
     if (Math.hypot(e.clientX - startX, e.clientY - startY) < DRAG_THRESHOLD) return;
-    dragging = { r, rect: $('board').getBoundingClientRect() };
+    dragging = { r, rect: corkBox() };
     r.el.classList.add('dragging');
     r.el.setPointerCapture(e.pointerId);
   }
@@ -625,7 +634,7 @@ $('board').addEventListener('click', (e) => {
 $('notepad').addEventListener('click', async () => {
   setThreading(false);
   // Aparece en la zona del corcho que se está viendo, un poco al azar
-  const board = $('board').getBoundingClientRect();
+  const board = corkBox();
   const cx = ((Math.min(window.innerWidth, board.right) + Math.max(0, board.left)) / 2 - board.left) / board.width * 100;
   const cy = ((Math.min(window.innerHeight, board.bottom) + Math.max(0, board.top)) / 2 - board.top) / board.height * 100;
   const x = cx + (Math.random() * 16 - 8);
@@ -677,7 +686,7 @@ function curve(a, b) {
 function drawThreads() {
   const board = $('board');
   if ($('boardView').classList.contains('hidden')) return;
-  const rect = board.getBoundingClientRect();
+  const rect = corkBox();
   const lines = [];
   for (const t of threads) {
     const a = pinPoint(t.from, rect);
@@ -766,7 +775,7 @@ async function pickThreadEnd(r) {
 
 $('board').addEventListener('pointermove', (e) => {
   if (!threading || !threadFrom) return;
-  const rect = $('board').getBoundingClientRect();
+  const rect = corkBox();
   pointer = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 });
 
