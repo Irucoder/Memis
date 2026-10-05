@@ -399,6 +399,7 @@ async function patch(id, fields) {
 
 $('logoutBtn').addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+  memisSession.clear();
   location.replace('/');
 });
 

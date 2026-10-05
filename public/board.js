@@ -100,6 +100,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) load
 
 $('logoutBtn').addEventListener('click', async () => {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+  memisSession.clear();
   location.replace('/');
 });
 

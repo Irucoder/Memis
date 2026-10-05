@@ -138,6 +138,7 @@
     <div class="denied" id="denied" role="alert">Acceso denegado</div>
   </main>
 
+  <script src="/auth.js"></script>
   <script>
     const form = document.getElementById('login');
     const input = document.getElementById('password');
@@ -162,6 +163,7 @@
     };
     const salida = new URLSearchParams(location.search).get('salida');
     if (salida) {
+      memisSession.clear(); // la sesión guardada ya no sirve
       history.replaceState(null, '', '/');
       denied.textContent = (MOTIVOS[salida] || 'Se cerró la sesión') + ' · ingresá de nuevo';
       denied.classList.add('stay');
@@ -183,6 +185,7 @@
         if (r.status === 401) throw new Error('Acceso denegado');
         // Cualquier otra cosa no es la clave: es el servidor (se ve distinto para no confundir)
         if (!r.ok) throw Object.assign(new Error('Falla del servidor'), { detail: r.status + ' ' + (data.error || '') });
+        if (data.token) memisSession.set(data.token);
         go(data.role);
       } catch (err) {
         if (err.detail || err.name === 'TypeError') console.error('Ingreso:', err.detail || err.message);
