@@ -160,10 +160,14 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ password: input.value }),
         });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Acceso denegado');
+        const data = await r.json().catch(() => ({}));
+        if (r.status === 401) throw new Error('Acceso denegado');
+        // Cualquier otra cosa no es la clave: es el servidor (se ve distinto para no confundir)
+        if (!r.ok) throw Object.assign(new Error('Falla del servidor'), { detail: r.status + ' ' + (data.error || '') });
         go(data.role);
-      } catch {
+      } catch (err) {
+        if (err.detail || err.name === 'TypeError') console.error('Ingreso:', err.detail || err.message);
+        denied.textContent = err.message === 'Acceso denegado' ? 'Acceso denegado' : 'Falla del servidor · probá de nuevo';
         for (const el of [slot, denied]) {
           el.classList.remove('shake', 'show');
           void el.offsetWidth;

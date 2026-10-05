@@ -21,7 +21,7 @@ Los documentos y la configuración se guardan en **Netlify Blobs**, el almacenam
 ## Cómo se ve
 
 - **Portada** (`public/fondo.webp`): la carpeta del Club de Memis; la clave se escribe en la etiqueta blanca vacía y se confirma con Enter.
-- **Tablero** (`public/marco.webp` + `public/corcho-centro.webp`): un corcho con marco bajo la lámpara, con las pistas clavadas con chinches. Ocupa todo el ancho y entra completo en la pantalla; el marco se arma con los bordes de la foto para que no se deforme al estirarse.
+- **Tablero** (`public/marco.webp` + `public/corcho-centro.webp`): un corcho con marco bajo la lámpara, con las pistas clavadas con chinches. Proporción 2.2 : 1 (un poco más ancho que la foto) y entra completo en la pantalla; el marco se arma con los bordes de la foto para que no se deforme.
 - **Hilo rojo**: a la derecha hay un carretel. Tocándolo, cada jugador puede unir dos pistas con hilo (tocar una y después la otra). Tocar un hilo permite cortarlo. Los hilos se guardan en el servidor, los ven todos los jugadores y no se borran al cargar nueva evidencia. Desde el panel admin se ve cuántos hay y se pueden borrar todos.
 
 - **Acomodar**: cualquiera puede arrastrar las pistas reveladas a otro lugar del corcho; la posición se guarda para todos. El admin, con el botón *Acomodar*, además puede rotarlas y cambiarles el tamaño (rueda del mouse / Shift + rueda).
@@ -69,3 +69,7 @@ En local los datos se guardan en la carpeta `data/`.
 - `lib/core.js` — reglas del juego (contraseñas, horarios, visibilidad de documentos).
 - `netlify/functions/api.mjs` — función de Netlify que usa `lib/core.js` con Netlify Blobs.
 - `server.js` — servidor local que usa `lib/core.js` con la carpeta `data/`.
+
+## Si algo falla
+
+Abrí `https://TU-SITIO.netlify.app/api/health`: muestra si el almacenamiento y las sesiones responden (sin mostrar datos). Si la portada dice **"Falla del servidor"** en vez de "Acceso denegado", el problema no es la clave sino el servidor.

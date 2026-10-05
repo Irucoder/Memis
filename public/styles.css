@@ -361,12 +361,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .board {
   position: relative;
   container-type: inline-size;
-  /* ocupa todo el ancho disponible y entra completo en la pantalla, debajo de la lámpara */
-  width: 100%;
+  /* proporción fija (un poco más ancha que la foto) y entra completo en la pantalla,
+     debajo de la lámpara: el alto disponible manda */
+  aspect-ratio: 2.2;
+  width: min(100%, calc((100vh - 240px) * 2.2));
+  width: min(100%, calc((100dvh - 240px) * 2.2));
   min-width: 860px;
-  height: calc(100vh - 240px);
-  height: calc(100dvh - 240px);
-  min-height: 420px;
   margin: 0 auto;
   /* el marco sale de la foto (bordes, sin deformar las esquinas) y el corcho va aparte,
      así el tablero se puede estirar a lo ancho */
