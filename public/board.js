@@ -83,12 +83,14 @@ async function load() {
 
   $('spool').classList.toggle('hidden', s.locked);
   $('notepad').classList.toggle('hidden', s.locked);
+  $('folderBtn').classList.toggle('hidden', s.locked);
   if (s.locked) {
     setThreading(false);
     showWait();
   } else {
     threads = s.threads || [];
-    showBoard(s.docs);
+    showBoard(s.docs.filter((d) => !d.folder));
+    showArchive(s.docs.filter((d) => d.folder));
     showNotes(s.notes || []);
   }
 }
@@ -402,6 +404,14 @@ function openLightbox(d) {
   const dl = $('lbDownload');
   dl.classList.add('hidden');
   dl.textContent = 'Abrir original';
+  // Guardar en el archivo / pasar al tablero, desde el documento abierto
+  const mv = $('lbMove');
+  mv.classList.toggle('hidden', !!d.pending && !d.kind);
+  mv.textContent = d.folder ? '📌 Pasar al tablero' : '🗂 Guardar en el archivo';
+  mv.onclick = async () => {
+    closeLightbox();
+    await moveDoc(d.id, !d.folder);
+  };
 
   if (d.kind === 'text') {
     const paper = document.createElement('div');
@@ -465,7 +475,10 @@ lightbox.addEventListener('click', (e) => {
   if (e.target === lightbox) closeLightbox();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && lightbox.classList.contains('open')) closeLightbox();
+  if (e.key === 'Escape' && lightbox.classList.contains('open')) {
+    e.preventDefault(); // que el Escape no cierre también el archivo de abajo
+    closeLightbox();
+  }
 });
 
 function docFromEvent(e) {
@@ -548,7 +561,7 @@ $('board').addEventListener('pointermove', (e) => {
   const { r, startX, startY, x0, y0 } = pressed;
   if (!dragging) {
     if (Math.hypot(e.clientX - startX, e.clientY - startY) < DRAG_THRESHOLD) return;
-    dragging = { r, rect: corkBox() };
+    dragging = { r, rect: corkBox(), x0, y0 };
     r.el.classList.add('dragging');
     r.el.setPointerCapture(e.pointerId);
   }
@@ -557,6 +570,14 @@ $('board').addEventListener('pointermove', (e) => {
   r.doc.x = Math.round(p.x * 100) / 100;
   r.doc.y = Math.round(p.y * 100) / 100;
   placeDoc(r.el, r.doc);
+  // ¿la está soltando sobre la carpeta del archivo?
+  if (r.type !== 'note') {
+    const f = $('folderBtn').getBoundingClientRect();
+    const over = e.clientX >= f.left - 12 && e.clientX <= f.right + 12 && e.clientY >= f.top - 12 && e.clientY <= f.bottom + 12;
+    dragging.overFolder = over;
+    $('folderBtn').classList.toggle('drop-target', over);
+    r.el.classList.toggle('to-folder', over);
+  }
 });
 
 function endDrag() {
@@ -567,11 +588,135 @@ function endDrag() {
   dragging = null;
   suppressClick = true; // el click que sigue al soltar no abre el documento
   setTimeout(() => { suppressClick = false; }, 0);
-  r.el.classList.remove('dragging');
+  r.el.classList.remove('dragging', 'to-folder');
+  $('folderBtn').classList.remove('drop-target');
+  if (wasDragging.overFolder) { // vuelve a su lugar en el corcho (para cuando la saquen) y se guarda
+    r.doc.x = wasDragging.x0;
+    r.doc.y = wasDragging.y0;
+    placeDoc(r.el, r.doc);
+    moveDoc(r.doc.id, true);
+    return;
+  }
   r.doc.z = maxZ() + 1;
   placeDoc(r.el, r.doc);
   saveLayout(r);
 }
+
+// ---------- Archivo (carpeta de evidencias) ----------
+// Pistas guardadas fuera del corcho. Cualquiera puede guardar una pista acá o
+// pasarla al tablero; se guarda para todos. El admin elige dónde empieza cada una.
+
+let archiveDocs = [];
+let archiveSig = '';
+
+async function moveDoc(id, toFolder) {
+  try {
+    const res = await fetch('/api/layout/' + id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(toFolder ? { folder: true } : { folder: false, z: maxZ() + 1 }),
+    });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'No se pudo mover');
+    toast(toFolder ? 'Guardada en el archivo' : 'Pasó al tablero');
+    $('folderBtn').classList.add('bump');
+    setTimeout(() => $('folderBtn').classList.remove('bump'), 500);
+  } catch (e) {
+    toast(e.message);
+  }
+  await load();
+}
+
+function archiveThumb(d) {
+  const box = document.createElement('div');
+  box.className = 'archive-thumb';
+  if (d.pending && !d.kind) {
+    box.classList.add('unknown');
+    box.textContent = '?';
+  } else if (d.kind === 'text' && d.text.trim().length <= 12) { // letras o palabras sueltas: bien grandes
+    box.classList.add('paper', 'big');
+    if (d.style === 'nota') box.classList.add('nota');
+    box.textContent = d.text.trim();
+  } else if (d.kind === 'text') {
+    box.classList.add('paper');
+    if (d.style === 'nota') box.classList.add('nota');
+    if (d.title) box.appendChild(Object.assign(document.createElement('div'), { className: 'doc-title', textContent: d.title }));
+    box.appendChild(Object.assign(document.createElement('div'), { className: 'doc-text', textContent: d.text }));
+  } else if (isImage(d)) {
+    box.appendChild(Object.assign(document.createElement('img'), { src: d.file, alt: '', loading: 'lazy' }));
+  } else if (isVideo(d)) {
+    const link = d.kind === 'link' ? videoLink(d.url) : null;
+    if (!link) {
+      box.appendChild(Object.assign(document.createElement('video'), { src: d.file + '#t=0.5', muted: true, preload: 'metadata', playsInline: true }));
+    } else if (link.thumb) {
+      const img = Object.assign(document.createElement('img'), { src: link.thumb, alt: '', loading: 'lazy' });
+      img.addEventListener('error', () => { img.remove(); box.classList.add('film'); });
+      box.appendChild(img);
+    } else {
+      box.classList.add('film');
+    }
+    box.appendChild(playBadge());
+  } else if (isPdf(d)) {
+    box.classList.add('paper');
+    getPdf(d.file).then((pdf) => renderPage(pdf, 1, 160)).then((c) => box.replaceChildren(c)).catch(() => { box.textContent = 'PDF'; });
+  } else {
+    box.classList.add('paper');
+    box.textContent = 'Documento';
+  }
+  return box;
+}
+
+function showArchive(docs) {
+  archiveDocs = docs;
+  const count = $('folderCount');
+  count.textContent = docs.length;
+  count.classList.toggle('hidden', docs.length === 0);
+
+  const sig = JSON.stringify(docs);
+  if (sig === archiveSig) return;
+  archiveSig = sig;
+  const grid = $('archiveGrid');
+  grid.replaceChildren();
+  $('archiveEmpty').classList.toggle('hidden', docs.length > 0);
+  for (const d of [...docs].sort((a, b) => (b.z || 0) - (a.z || 0))) {
+    const unknown = d.pending && !d.kind;
+    const card = document.createElement('div');
+    card.className = 'archive-card';
+    card.appendChild(archiveThumb(d));
+    card.appendChild(Object.assign(document.createElement('div'), {
+      className: 'archive-title',
+      textContent: unknown ? 'Todavía no revelado' : d.title || d.caption || 'Sin título',
+    }));
+    if (!unknown) {
+      const actions = document.createElement('div');
+      actions.className = 'archive-actions';
+      const view = Object.assign(document.createElement('button'), { className: 'btn small dark', type: 'button', textContent: 'Ver' });
+      view.addEventListener('click', () => openLightbox(d));
+      const pin = Object.assign(document.createElement('button'), { className: 'btn small', type: 'button', textContent: 'Al tablero' });
+      pin.addEventListener('click', async () => {
+        pin.disabled = true;
+        await moveDoc(d.id, false);
+      });
+      actions.append(view, pin);
+      card.appendChild(actions);
+    }
+    grid.appendChild(card);
+  }
+}
+
+function openArchive() {
+  setThreading(false);
+  $('archive').classList.add('open');
+  $('archiveClose').focus();
+}
+function closeArchive() {
+  $('archive').classList.remove('open');
+}
+$('folderBtn').addEventListener('click', () => ($('archive').classList.contains('open') ? closeArchive() : openArchive()));
+$('archiveClose').addEventListener('click', closeArchive);
+$('archive').addEventListener('click', (e) => { if (e.target === $('archive')) closeArchive(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !e.defaultPrevented && $('archive').classList.contains('open')) closeArchive();
+});
 $('board').addEventListener('pointerup', endDrag);
 $('board').addEventListener('pointercancel', endDrag);
 

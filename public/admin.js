@@ -188,6 +188,7 @@ $('uploadForm').addEventListener('submit', async (e) => {
     kind,
     caption: $('fCaption').value.trim(),
     preview: $('fPreview').value,
+    place: $('fPlace').value,
     publishAt: later ? fromLocalInput($('fPublishAt').value) : null,
   };
   if ($('fStyle').value !== 'auto') common.style = $('fStyle').value;
@@ -279,6 +280,7 @@ function docItem(d) {
       <div class="controls">
         <div class="field"><label>Aparece</label><input type="datetime-local" data-f="publishAt"></div>
         <div class="field"><label>Antes de aparecer</label><select data-f="preview"></select></div>
+        <div class="field"><label>Empieza en</label><select data-f="place"></select></div>
         <div class="field"><label>Estilo</label><select data-f="style"></select></div>
         <div class="field"><label>Tamaño (%)</label><input type="number" data-f="w" min="4" max="60" step="0.5"></div>
         <div class="field"><label>Rotación (°)</label><input type="number" data-f="rot" min="-45" max="45" step="0.5"></div>
@@ -299,6 +301,8 @@ function docItem(d) {
   q('rot').value = d.rot;
   [['default', 'Según configuración general'], ['show', 'Mostrar silueta con ?'], ['hide', 'No mostrar nada']]
     .forEach(([v, l]) => q('preview').appendChild(option(v, l, d.preview)));
+  [['board', 'El tablero'], ['folder', 'El archivo (carpeta)']]
+    .forEach(([v, l]) => q('place').appendChild(option(v, l, d.place || 'board')));
   [['papel', 'Hoja de papel'], ['polaroid', 'Polaroid'], ['foto', 'Foto con chinche'], ['recorte', 'Recorte de diario'], ['nota', 'Nota adhesiva']]
     .forEach(([v, l]) => q('style').appendChild(option(v, l, d.style)));
 
@@ -308,7 +312,7 @@ function docItem(d) {
     pill.textContent = 'Programado · ' + fmt(d.publishAt);
   } else {
     pill.className = 'pill live';
-    pill.textContent = 'Publicado';
+    pill.textContent = d.folder ? 'Publicado · en el archivo' : 'Publicado · en el tablero';
   }
 
   item.querySelectorAll('[data-f]').forEach((input) => input.addEventListener('change', () => {

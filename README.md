@@ -28,6 +28,7 @@ Los documentos y la configuración se guardan en **Netlify Blobs**, el almacenam
 - **PDF**: se ve la primera página en el corcho; si tiene más páginas, al pasar el mouse asoman las hojas de abajo. Al abrirlo se muestran todas las páginas como hojas, sin la barra del visor del navegador (usa pdf.js, incluido en `public/vendor/pdfjs`).
 
 - **Post-its**: debajo del carretel hay un bloc. Tocándolo aparece un post-it en el corcho para escribir una palabra o frase corta (hasta 80 caracteres). Se pueden mover, editar (click), despegar (×) y atar con hilo rojo. Se guardan para todos.
+- **Archivo (carpeta de evidencias)**: debajo del bloc de post-its hay una carpeta con un contador. Al cargar un documento el admin elige si empieza **en el tablero** o **guardado en el archivo**. Los jugadores abren la carpeta, ven cada pista y la pasan **al tablero**; y desde el tablero pueden guardar una pista arrastrándola hasta la carpeta o con el botón "Guardar en el archivo" al abrirla. Se guarda para todos.
 - **Videos**: se pueden subir archivos de video (mp4, webm, mov; hasta ~5,8 MB) o cargar un **video por link** (YouTube —puede ser "oculto"—, Google Drive compartido con link, o Vimeo). En el corcho se ven como foto con botón de play y al abrirlos se reproducen.
 - **Ícono de la pestaña**: `public/favicon.ico`, `favicon-32.png` y `apple-touch-icon.png` (la lupa del Club de Memis).
 - **Límites**: ninguna pista ni post-it se puede ubicar fuera del corcho.

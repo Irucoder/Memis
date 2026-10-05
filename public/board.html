@@ -70,12 +70,35 @@
       <span class="spool-label">Post-it</span>
     </button>
 
+    <button class="folder-btn hidden" id="folderBtn" type="button" title="Archivo de evidencias: pistas guardadas">
+      <span class="folder-body" aria-hidden="true">
+        <span class="folder-back"></span>
+        <span class="folder-paper"></span>
+        <span class="folder-front"></span>
+      </span>
+      <span class="folder-count hidden" id="folderCount">0</span>
+      <span class="spool-label">Archivo</span>
+    </button>
+
     <div class="vignette" aria-hidden="true"></div>
   </main>
 
+  <div class="archive" id="archive" role="dialog" aria-modal="true" aria-labelledby="archiveTitle">
+    <div class="archive-sheet">
+      <div class="archive-tab" id="archiveTitle">Archivo · Exp. 0417</div>
+      <button class="archive-close" id="archiveClose" type="button" aria-label="Cerrar archivo">×</button>
+      <p class="archive-hint">Pistas guardadas. Pasalas al tablero cuando quieras, o arrastrá una pista del tablero hasta la carpeta para guardarla acá.</p>
+      <div class="archive-grid" id="archiveGrid"></div>
+      <div class="archive-empty hidden" id="archiveEmpty">La carpeta está vacía.</div>
+    </div>
+  </div>
+
   <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Documento ampliado">
     <button class="lb-close" id="lbClose" type="button" aria-label="Cerrar">×</button>
-    <a class="btn small dark lb-download hidden" id="lbDownload" target="_blank" rel="noopener">Abrir original</a>
+    <div class="lb-actions">
+      <button class="btn small lb-move hidden" id="lbMove" type="button"></button>
+      <a class="btn small dark hidden" id="lbDownload" target="_blank" rel="noopener">Abrir original</a>
+    </div>
     <div class="lb-content" id="lbContent"></div>
   </div>
 
