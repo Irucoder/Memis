@@ -194,6 +194,7 @@ $('uploadForm').addEventListener('submit', async (e) => {
     publishAt: later ? fromLocalInput($('fPublishAt').value) : null,
   };
   if ($('fStyle').value !== 'auto') common.style = $('fStyle').value;
+  if ($('fNew').checked) common.isNew = true;
   if ($('fLock').checked) {
     if (!$('fLockKey').value.trim()) return toast('Escribí la clave para desbloquear la pista');
     common.lockKey = $('fLockKey').value.trim();
@@ -283,6 +284,7 @@ function docItem(d) {
     <div>
       <div class="top">
         <input type="text" data-f="title" aria-label="Título">
+        <label class="new-toggle" title="Mostrar el cartelito de NUEVO en el tablero"><input type="checkbox" data-f="isNew"> NUEVO</label>
         <span class="pill"></span>
       </div>
       <div class="controls">
@@ -310,6 +312,7 @@ function docItem(d) {
   q('caption').value = d.caption;
   q('lockKey').value = d.lockKey || '';
   q('lockHint').value = d.lockHint || '';
+  q('isNew').checked = !!d.isNew;
   q('publishAt').value = toLocalInput(d.publishAt);
   q('w').value = d.w;
   q('rot').value = d.rot;
@@ -337,7 +340,7 @@ function docItem(d) {
 
   item.querySelectorAll('[data-f]').forEach((input) => input.addEventListener('change', () => {
     const f = input.dataset.f;
-    let value = input.value;
+    let value = input.type === 'checkbox' ? input.checked : input.value;
     if (f === 'publishAt') value = fromLocalInput(value);
     if (f === 'w' || f === 'rot') value = Number(value);
     patch(d.id, { [f]: value });

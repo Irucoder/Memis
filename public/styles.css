@@ -643,6 +643,59 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .board.editing .doc:hover .doc-body { animation: none; }
 .board.editing { outline: 1px dashed rgba(241, 230, 74, 0.35); outline-offset: 8px; }
 
+/* ---------- Cartelito de NUEVO ---------- */
+
+.new-tag {
+  position: absolute;
+  top: 0.8cqw;
+  left: -0.9cqw;
+  z-index: 4;
+  padding: 0.25cqw 0.7cqw;
+  background: #c8232c;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: max(9px, 0.8cqw);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transform: rotate(-12deg);
+  box-shadow: 0 0.2cqw 0.5cqw rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  animation: new-pulse 2.2s ease-in-out infinite;
+}
+.new-tag::after { /* puntita de la cinta */
+  content: '';
+  position: absolute;
+  right: -0.5cqw; top: 0;
+  border-style: solid;
+  border-width: 0.65cqw 0 0.65cqw 0.5cqw;
+  border-color: transparent transparent transparent #c8232c;
+}
+@keyframes new-pulse {
+  0%, 100% { transform: rotate(-12deg) scale(1); }
+  50% { transform: rotate(-12deg) scale(1.08); }
+}
+.archive-card { position: relative; }
+.archive-card .new-tag { top: 6px; left: -8px; font-size: 11px; padding: 3px 9px; }
+.archive-card .new-tag::after { border-width: 9px 0 9px 7px; right: -7px; }
+.folder-btn.has-new::before {
+  content: 'Nuevo';
+  position: absolute;
+  top: -10px; left: -14px;
+  z-index: 1;
+  padding: 2px 7px;
+  background: #c8232c;
+  color: #fff;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  transform: rotate(-14deg);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+  animation: new-pulse 2.2s ease-in-out infinite;
+}
+
 /* ---------- Pistas con clave ---------- */
 
 .doc.sealed .doc-body.seal-body { /* gana sobre el estilo de la pista (polaroid, papel…) */

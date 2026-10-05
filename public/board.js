@@ -219,6 +219,11 @@ function videoLink(url) {
 
 const LOCK_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><rect x="4.5" y="10" width="15" height="11" rx="2" fill="currentColor"/><circle cx="12" cy="15.2" r="1.6" fill="#7a1418"/><path d="M12 16.4v2" stroke="#7a1418" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
+// Cartelito de NUEVO (lo activa y desactiva el admin)
+function newTag() {
+  return Object.assign(document.createElement('span'), { className: 'new-tag', textContent: 'Nuevo' });
+}
+
 function playBadge() {
   return Object.assign(document.createElement('span'), { className: 'play-badge', ariaHidden: 'true' });
 }
@@ -258,6 +263,7 @@ function buildDoc(d) {
     el.appendChild(Object.assign(document.createElement('span'), { className: 'pin' }));
     body.classList.add('seal-body');
     body.innerHTML = '<span class="seal-stamp">Clasificado</span><span class="wax">' + LOCK_SVG + '</span><span class="seal-label">Bloqueada</span>';
+    if (d.isNew) el.appendChild(newTag());
     return el;
   }
 
@@ -305,6 +311,7 @@ function buildDoc(d) {
     body.appendChild(Object.assign(document.createElement('div'), { className: 'doc-caption', textContent: d.caption || d.title || '' }));
   }
 
+  if (d.isNew) el.appendChild(newTag());
   if (d.sealed) { // vista admin: tiene clave y nadie la abrió todavía
     el.appendChild(Object.assign(document.createElement('span'), { className: 'lock-badge', textContent: '🔒' }));
   }
@@ -754,6 +761,8 @@ function showArchive(docs) {
   const count = $('folderCount');
   count.textContent = docs.length;
   count.classList.toggle('hidden', docs.length === 0);
+  // si hay algo nuevo guardado en el archivo, la carpeta también lo avisa
+  $('folderBtn').classList.toggle('has-new', docs.some((d) => d.isNew && !(d.pending && !d.kind)));
 
   const sig = JSON.stringify(docs);
   if (sig === archiveSig) return;
@@ -766,6 +775,7 @@ function showArchive(docs) {
     const card = document.createElement('div');
     card.className = 'archive-card';
     card.appendChild(archiveThumb(d));
+    if (d.isNew && !unknown) card.appendChild(newTag());
     card.appendChild(Object.assign(document.createElement('div'), {
       className: 'archive-title',
       textContent: unknown ? 'Todavía no revelado' : d.locked ? 'Pista bloqueada' : d.title || d.caption || 'Sin título',

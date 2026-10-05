@@ -49,6 +49,9 @@
     .doc-item .top input[type=text] { flex: 1; min-width: 160px; }
     .pill { font-size: 11px; letter-spacing: 0.1em; padding: 3px 8px; border-radius: 20px; text-transform: uppercase; white-space: nowrap; }
     .pill.live { background: rgba(80, 180, 110, 0.18); color: #7fd99a; }
+    .new-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 6px; border-radius: 20px; border: 1px solid var(--line); cursor: pointer; font-size: 11px; letter-spacing: 0.1em; color: var(--text-dim); white-space: nowrap; }
+    .new-toggle input { accent-color: #c8443a; margin: 0; }
+    .new-toggle:has(input:checked) { background: #c8443a; border-color: #c8443a; color: #fff; }
     .pill.sched { background: rgba(241, 230, 74, 0.14); color: var(--highlight); }
     .doc-item .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 12px; align-items: end; }
     .doc-item .controls .field { margin: 0; }
@@ -165,6 +168,12 @@
               <option value="folder">Guardado en el archivo (carpeta)</option>
             </select>
           </div>
+        </div>
+        <div class="field">
+          <label class="switch" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--text)">
+            <input type="checkbox" id="fNew">
+            <span>🆕 Marcar como <strong>NUEVO</strong>: aparece con un cartelito hasta que lo desactives</span>
+          </label>
         </div>
         <div class="field">
           <label class="switch" style="text-transform:none;letter-spacing:0;font-size:14px;color:var(--text)">
