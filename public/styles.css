@@ -353,7 +353,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   min-height: 100vh;
   min-height: 100dvh;
   overflow: auto;
-  padding: 200px 120px 40px; /* aire entre la lámpara y el corcho */
+  padding: 158px 0 22px; /* el corcho arranca justo debajo de la lámpara */
 }
 @media (max-width: 900px) {
   .board-scroll { padding: 180px 16px 120px; }
@@ -361,11 +361,12 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .board {
   position: relative;
   container-type: inline-size;
-  /* proporción fija (un poco más ancha que la foto) y entra completo en la pantalla,
-     debajo de la lámpara: el alto disponible manda */
-  aspect-ratio: 1.9;
-  width: min(100%, calc((100vh - 240px) * 1.9));
-  width: min(100%, calc((100dvh - 240px) * 1.9));
+  /* Proporción 2,03 : 1 (el recuadro marcado en la captura): ~85 % del ancho,
+     centrado bajo la lámpara y completo en la pantalla, sin bajar.
+     El "100vw - 240px" deja lugar a la derecha para el carretel, el bloc y la carpeta. */
+  aspect-ratio: 2.03;
+  width: min(85vw, calc(100vw - 240px), calc((100vh - 176px) * 2.03));
+  width: min(85vw, calc(100vw - 240px), calc((100dvh - 176px) * 2.03));
   min-width: 860px;
   margin: 0 auto;
   /* el marco sale de la foto (bordes, sin deformar las esquinas) y el corcho va aparte,
@@ -373,6 +374,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   border: clamp(16px, 1.9vw, 34px) solid transparent;
   border-image: url('/marco.webp') 28 stretch;
   background: url('/corcho-centro.webp') center / cover no-repeat;
+  isolation: isolate; /* las zonas de los hilos (z-index -1) quedan sobre el corcho y bajo las pistas */
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.65), 0 6px 14px rgba(0, 0, 0, 0.5);
 }
 .board::after { /* luz de la lámpara sobre el corcho */
@@ -492,6 +494,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: #f4f1ea;
   padding: 5% 5% 0;
 }
+.doc.compact .doc-caption,
+.doc.compact .doc-body > .doc-title:first-child { display: none; } /* pista chica: sin epígrafe (al abrirla se ve) */
+.doc.s-polaroid.compact .doc-body { padding-bottom: 5%; }
 .doc.s-polaroid .doc-caption {
   font-family: var(--font-type);
   color: var(--ink);
@@ -867,11 +872,19 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .threads .t-shadow { fill: none; stroke: rgba(0, 0, 0, 0.35); stroke-linecap: round; }
 .threads .t-line { fill: none; stroke: #b4222c; stroke-linecap: round; }
 .threads .t-hi { fill: none; stroke: rgba(255, 150, 150, 0.35); stroke-linecap: round; }
-.threads .t-hit { fill: none; stroke: transparent; pointer-events: stroke; cursor: pointer; }
-/* mientras se ata un hilo, los que ya están no tapan las pistas (si no, no se podía
-   atar un segundo hilo tocando la chinche de una pista que ya tenía uno) */
-.board.threading .threads .t-hit { pointer-events: none; }
-.threads g:hover .t-line { stroke: #de3a44; }
+.thread-hits { /* zona para tocar los hilos: debajo de las pistas */
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  z-index: -1;
+  pointer-events: none;
+}
+.thread-hits path { fill: none; stroke: transparent; stroke-linecap: round; pointer-events: stroke; cursor: pointer; }
+/* mientras se ata un hilo, tocar un hilo que ya está no abre el menú de cortar */
+.board.threading .thread-hits path { pointer-events: none; }
+.threads g.hover .t-line { stroke: #de3a44; }
 .threads .t-draft { fill: none; stroke: #b4222c; stroke-linecap: round; stroke-dasharray: 6 5; opacity: 0.85; }
 .threads .knot { fill: #8e1820; }
 

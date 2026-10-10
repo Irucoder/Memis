@@ -240,12 +240,17 @@ function playBadge() {
   return Object.assign(document.createElement('span'), { className: 'play-badge', ariaHidden: 'true' });
 }
 
+// Por debajo de este ancho (en % del corcho) la pista se ve sin su epígrafe;
+// al abrirla se lee completo.
+const COMPACT_W = 8;
+
 function placeDoc(el, d) {
   el.style.left = d.x + '%';
   el.style.top = d.y + '%';
   el.style.width = d.w + '%';
   el.style.zIndex = d.z || 0;
   el.style.setProperty('--rot', d.rot + 'deg');
+  el.classList.toggle('compact', d.w < COMPACT_W);
 }
 
 function buildDoc(d) {
@@ -283,6 +288,7 @@ function buildDoc(d) {
   }
 
   el.setAttribute('aria-label', d.title || 'Documento');
+  el.title = 'Click para ver · Arrastrá para mover · Shift + rueda (o Shift + / −) para agrandar o achicar';
   el.appendChild(Object.assign(document.createElement('span'), { className: 'pin' }));
 
   if (d.kind === 'text') {
@@ -641,7 +647,8 @@ function saveLayout(r) {
     const res = await fetch(isNote ? '/api/notes/' + r.doc.id : '/api/layout/' + r.doc.id, {
       method: isNote ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(role === 'admin' && !isNote ? { x, y, z, rot, w } : { x, y, z }),
+      // jugadores: posición y tamaño; el admin además la rotación
+      body: JSON.stringify(isNote ? { x, y, z } : role === 'admin' ? { x, y, z, rot, w } : { x, y, z, w }),
     }).catch(() => null);
     if (!res || !res.ok) toast('No se pudo guardar la posición');
     unsaved.delete(r.doc.id);
@@ -830,18 +837,72 @@ document.addEventListener('keydown', (e) => {
 $('board').addEventListener('pointerup', endDrag);
 $('board').addEventListener('pointercancel', endDrag);
 
+// ---------- Tamaño de las pistas (todos) ----------
+// Shift + rueda, o Shift + "+" / "−" con el mouse sobre la pista. Se guarda para todos.
+
+const SIZE_STEP = 0.6; // en % del ancho del corcho
+const MIN_W = 4;
+const MAX_W = 60;
+
+const resizable = (r) => r && r.type !== 'note' && !(r.doc.pending && !r.doc.kind);
+
+function resizeDoc(r, dir) {
+  const w = Math.round((r.doc.w + dir * SIZE_STEP) * 10) / 10;
+  r.doc.w = Math.min(MAX_W, Math.max(MIN_W, w));
+  placeDoc(r.el, r.doc);
+  keepInside(r);
+  saveLayout(r);
+}
+
+// La rueda de un mouse da saltos de ~100; la de un trackpad, muchos pasitos chicos:
+// se acumula para que un "clic" de rueda sea un paso de tamaño.
+let wheelAcc = 0;
+let wheelTarget = null;
 $('board').addEventListener('wheel', (e) => {
-  if (!editing) return;
   const r = docFromEvent(e);
   if (!r || r.type === 'note') return;
+  if (e.shiftKey) {
+    if (!resizable(r)) return;
+    e.preventDefault();
+    if (wheelTarget !== r) { wheelTarget = r; wheelAcc = 0; }
+    const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 300 : 1; // Firefox mide en líneas
+    wheelAcc += (e.deltaY || e.deltaX) * unit;
+    if (Math.abs(wheelAcc) < 50) return;
+    resizeDoc(r, wheelAcc < 0 ? 1 : -1); // rueda hacia arriba: más grande
+    wheelAcc = 0;
+    return;
+  }
+  if (!editing) return; // rotar: solo el admin, en modo Acomodar
   e.preventDefault();
   const dir = (e.deltaY || e.deltaX) > 0 ? 1 : -1;
-  if (e.shiftKey) r.doc.w = Math.min(60, Math.max(4, Math.round((r.doc.w + dir * 0.5) * 10) / 10));
-  else r.doc.rot = Math.min(45, Math.max(-45, Math.round((r.doc.rot + dir) * 10) / 10));
+  r.doc.rot = Math.min(45, Math.max(-45, Math.round((r.doc.rot + dir) * 10) / 10));
   placeDoc(r.el, r.doc);
   keepInside(r);
   saveLayout(r);
 }, { passive: false });
+
+// Con el teclado: la pista que está bajo el mouse (o la que tiene el foco)
+let lastPointer = null;
+document.addEventListener('pointermove', (e) => { lastPointer = { x: e.clientX, y: e.clientY }; }, { passive: true });
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return; // no pisar el zoom del navegador
+  if (e.target.closest && e.target.closest('input, textarea, [contenteditable]')) return;
+  if (lightbox.classList.contains('open') || $('archive').classList.contains('open')) return;
+  // "+": tecla + (en teclados en español Shift + "+" da "*"), Shift + "=" (teclado inglés) o el + del numérico
+  const grow = e.key === '+' || e.code === 'NumpadAdd' || (e.shiftKey && (e.key === '=' || e.key === '*'));
+  const shrink = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract';
+  if (!grow && !shrink) return;
+  let el = document.activeElement && document.activeElement.closest && document.activeElement.closest('.doc');
+  if (lastPointer) {
+    const under = document.elementFromPoint(lastPointer.x, lastPointer.y);
+    el = (under && under.closest('.doc')) || el;
+  }
+  const r = el && rendered.get(el.dataset.id);
+  if (!resizable(r)) return;
+  e.preventDefault();
+  resizeDoc(r, grow ? 1 : -1);
+});
 
 // ---------- Post-its ----------
 // Notas cortas que escribe cualquier jugador. Se pueden mover, editar,
@@ -1025,6 +1086,10 @@ $('notepad').addEventListener('click', async () => {
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const svg = $('threads');
+// Los hilos se dibujan por encima de las pistas, pero la zona para tocarlos (y
+// cortarlos) va por debajo: así, sobre una pista, el click siempre es para la pista.
+const hitSvg = $('threadHits');
+let hoveredThread = null;
 let pointer = null; // posición del mouse en coordenadas del tablero
 let lastSig = '';
 
@@ -1072,16 +1137,18 @@ function drawThreads() {
 
   const w = Math.max(1.6, rect.width / 520); // grosor proporcional al tablero
   svg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
+  hitSvg.setAttribute('viewBox', `0 0 ${rect.width} ${rect.height}`);
   svg.replaceChildren();
+  hitSvg.replaceChildren();
   for (const l of lines) {
-    const g = svgEl('g', { 'data-id': l.id });
+    const g = svgEl('g', { 'data-id': l.id, class: l.id === hoveredThread ? 'hover' : '' });
     g.appendChild(svgEl('path', { d: l.d, class: 't-shadow', 'stroke-width': w * 1.4, transform: `translate(${w * 1.2} ${w * 2})` }));
     g.appendChild(svgEl('path', { d: l.d, class: 't-line', 'stroke-width': w }));
     g.appendChild(svgEl('path', { d: l.d, class: 't-hi', 'stroke-width': w * 0.35 }));
-    g.appendChild(svgEl('path', { d: l.d, class: 't-hit', 'stroke-width': Math.max(14, w * 6) }));
     g.appendChild(svgEl('circle', { cx: l.a.x, cy: l.a.y, r: w * 0.9, class: 'knot' }));
     g.appendChild(svgEl('circle', { cx: l.b.x, cy: l.b.y, r: w * 0.9, class: 'knot' }));
     svg.appendChild(g);
+    hitSvg.appendChild(svgEl('path', { d: l.d, 'data-id': l.id, 'stroke-width': Math.max(14, w * 6) }));
   }
   if (draft) svg.appendChild(svgEl('path', { d: draft, class: 't-draft', 'stroke-width': w }));
 }
@@ -1155,19 +1222,29 @@ document.addEventListener('keydown', (e) => {
 
 // Cortar un hilo: click sobre el hilo
 let threadToCut = null;
-svg.addEventListener('click', (e) => {
-  const g = e.target.closest('g[data-id]');
-  if (!g) return;
+hitSvg.addEventListener('click', (e) => {
+  const hit = e.target.closest('path[data-id]');
+  if (!hit) return;
   e.stopPropagation();
-  threadToCut = g.dataset.id;
+  threadToCut = hit.dataset.id;
   const menu = $('threadMenu');
   menu.style.left = e.clientX + 'px';
   menu.style.top = e.clientY + 'px';
   menu.classList.remove('hidden');
 });
 document.addEventListener('pointerdown', (e) => {
-  if (!e.target.closest('#threadMenu') && !e.target.closest('.threads g')) $('threadMenu').classList.add('hidden');
+  if (!e.target.closest('#threadMenu') && !e.target.closest('.thread-hits path')) $('threadMenu').classList.add('hidden');
 });
+// resaltar el hilo que está bajo el mouse (se recuerda aunque el tablero se redibuje)
+const markThread = (e, on) => {
+  const hit = e.target.closest('path[data-id]');
+  if (!hit) return;
+  hoveredThread = on ? hit.dataset.id : null;
+  const g = svg.querySelector(`g[data-id="${CSS.escape(hit.dataset.id)}"]`);
+  if (g) g.classList.toggle('hover', on);
+};
+hitSvg.addEventListener('pointerover', (e) => markThread(e, true));
+hitSvg.addEventListener('pointerout', (e) => markThread(e, false));
 $('cutThread').addEventListener('click', async () => {
   $('threadMenu').classList.add('hidden');
   if (!threadToCut) return;

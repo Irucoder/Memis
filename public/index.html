@@ -154,6 +154,14 @@
       input.focus();
     });
 
+    // Escribir apenas abre la portada: la tecla va a la casilla aunque todavía no tenga el foco
+    // (si no, la primera letra se perdía y la clave salía mal)
+    input.focus();
+    document.addEventListener('keydown', (e) => {
+      if (document.activeElement === input || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.length === 1 || e.key === 'Enter') input.focus();
+    }, true);
+
     // Si el tablero o el panel nos mandaron de vuelta, contar por qué
     const MOTIVOS = {
       'sin-cookie': 'El navegador no guardó la sesión',
