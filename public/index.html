@@ -22,7 +22,7 @@
     /* La imagen cubre la pantalla como "cover"; todo lo que va encima se
        ubica en porcentajes de la imagen, así la casilla queda siempre en su lugar. */
     .stage {
-      position: absolute;
+      position: fixed; /* fija: así no agranda la página en el celular (al girarlo quedaba alejada) */
       left: 50%;
       top: 50%;
       width: max(100vw, calc(100vh * 1821 / 1025));
@@ -122,6 +122,7 @@
       inset: 0;
       z-index: 2;
       overflow: hidden;
+      overflow: clip; /* que no se pueda desplazar (el pincel sobresale por la derecha) */
       pointer-events: none;
     }
     .tinta.cargando { visibility: hidden; }
@@ -190,8 +191,11 @@
     input.focus();
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
-      // solo si el foco no está en ningún lado (si está en el botón, que el botón maneje sus teclas)
-      if (document.activeElement && document.activeElement !== document.body) return;
+      const a = document.activeElement;
+      // en el pincel, las letras siguen yendo a la casilla (Enter y espacio mueven el pincel)
+      const pincel = a && a.classList && a.classList.contains('t-boton') && e.key.length === 1 && e.key !== ' ';
+      // si no, solo cuando el foco no está en ningún lado (si está en un botón, que el botón maneje sus teclas)
+      if (a && a !== document.body && !pincel) return;
       if (e.key.length === 1 || e.key === 'Enter') input.focus();
     }, true);
 
