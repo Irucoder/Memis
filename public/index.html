@@ -192,11 +192,15 @@
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const a = document.activeElement;
-      // en el pincel, las letras siguen yendo a la casilla (Enter y espacio mueven el pincel)
-      const pincel = a && a.classList && a.classList.contains('t-boton') && e.key.length === 1 && e.key !== ' ';
-      // si no, solo cuando el foco no está en ningún lado (si está en un botón, que el botón maneje sus teclas)
-      if (a && a !== document.body && !pincel) return;
-      if (e.key.length === 1 || e.key === 'Enter') input.focus();
+      // con el foco en un botón (el pincel, el de enviar), las letras siguen yendo a la casilla;
+      // Enter y espacio quedan para el botón
+      const enBoton = a && a.tagName === 'BUTTON' && e.key.length === 1 && e.key !== ' ';
+      if (a && a !== document.body && !enBoton) return;
+      if (e.key.length === 1 || e.key === 'Enter') {
+        const n = input.value.length;
+        input.focus();
+        input.setSelectionRange(n, n); // que agregue al final, sin reemplazar lo ya escrito
+      }
     }, true);
 
     // Si el tablero o el panel nos mandaron de vuelta, contar por qué

@@ -45,7 +45,10 @@
     const s = r.width / IMG_W;
     const libre = r.top + CARPETA_ARRIBA * s; // alto libre arriba de la carpeta
     let g, wx, wy, zx, zy, inPlace;
-    if (!portrait.matches || libre < 90) {
+    // arreglo vertical (celular): tintero arriba a la derecha y la zona a su izquierda
+    const gV = Math.min(s, (vw - 12) / (ESQ.w + ZONA.w - 40), libre / (ZONA.h + 10));
+    // si no entra arriba de la carpeta (ventanas casi cuadradas), va en la esquina
+    if (!portrait.matches || gV < s * 0.25) {
       const ax0 = r.left + IMG_W * s, ay0 = r.top + ESQ.y * s;
       const ax = Math.min(vw, ax0);
       const groupW = IMG_W - ZONA.x, groupH = ZONA.y + ZONA.h - ESQ.y;
@@ -57,7 +60,7 @@
       wx = ax - ESQ.w * g; wy = ay;
       zx = ax + (ZONA.x - IMG_W) * g; zy = ay + (ZONA.y - ESQ.y) * g;
     } else {
-      g = Math.min(s, (vw - 12) / (ESQ.w + ZONA.w - 40), libre / (ZONA.h + 10));
+      g = gV;
       wx = vw - ESQ.w * g;
       zx = wx + 40 * g - ZONA.w * g;
       zy = Math.max(6, (libre - ZONA.h * g) / 2);
