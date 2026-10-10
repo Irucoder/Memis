@@ -353,7 +353,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   min-height: 100vh;
   min-height: 100dvh;
   overflow: auto;
-  padding: 158px 0 22px; /* el corcho arranca justo debajo de la lámpara */
+  padding: 158px 0 18px; /* el corcho arranca justo debajo de la lámpara */
 }
 @media (max-width: 900px) {
   .board-scroll { padding: 180px 16px 120px; }
@@ -365,8 +365,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
      centrado bajo la lámpara y completo en la pantalla, sin bajar.
      El "100vw - 240px" deja lugar a la derecha para el carretel, el bloc y la carpeta. */
   aspect-ratio: 2.03;
-  width: min(85vw, calc(100vw - 240px), calc((100vh - 176px) * 2.03));
-  width: min(85vw, calc(100vw - 240px), calc((100dvh - 176px) * 2.03));
+  /* 158 px arriba + 18 px abajo + 1 px de margen: nunca aparece la barra de scroll */
+  width: min(85vw, calc(100vw - 240px), calc((100vh - 177px) * 2.03));
+  width: min(85vw, calc(100vw - 240px), calc((100dvh - 177px) * 2.03));
   min-width: 860px;
   margin: 0 auto;
   /* el marco sale de la foto (bordes, sin deformar las esquinas) y el corcho va aparte,
@@ -376,6 +377,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: url('/corcho-centro.webp') center / cover no-repeat;
   isolation: isolate; /* las zonas de los hilos (z-index -1) quedan sobre el corcho y bajo las pistas */
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.65), 0 6px 14px rgba(0, 0, 0, 0.5);
+}
+@media (min-width: 901px) {
+  .board { min-width: min(860px, calc(100vw - 240px)); }
 }
 .board::after { /* luz de la lámpara sobre el corcho */
   content: '';
@@ -494,8 +498,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
   background: #f4f1ea;
   padding: 5% 5% 0;
 }
-.doc.compact .doc-caption,
-.doc.compact .doc-body > .doc-title:first-child { display: none; } /* pista chica: sin epígrafe (al abrirla se ve) */
+.doc.compact .doc-caption { display: none; } /* pista chica: sin epígrafe (al abrirla se ve) */
+.doc-body > .doc-text:first-child { margin-top: 1.1cqw; } /* texto sin título: lugar para la chinche */
 .doc.s-polaroid.compact .doc-body { padding-bottom: 5%; }
 .doc.s-polaroid .doc-caption {
   font-family: var(--font-type);
@@ -883,7 +887,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 .thread-hits path { fill: none; stroke: transparent; stroke-linecap: round; pointer-events: stroke; cursor: pointer; }
 /* mientras se ata un hilo, tocar un hilo que ya está no abre el menú de cortar */
-.board.threading .thread-hits path { pointer-events: none; }
+.threads .t-hit { fill: none; stroke: transparent; stroke-linecap: round; pointer-events: stroke; cursor: pointer; }
+.board.threading .thread-hits path,
+.board.threading .threads .t-hit { pointer-events: none; }
 .threads g.hover .t-line { stroke: #de3a44; }
 .threads .t-draft { fill: none; stroke: #b4222c; stroke-linecap: round; stroke-dasharray: 6 5; opacity: 0.85; }
 .threads .knot { fill: #8e1820; }
@@ -1002,7 +1008,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 }
 @media (max-width: 900px) {
   .notepad { top: auto; bottom: 22px; right: 96px; }
-  .folder-btn { top: auto; bottom: 22px; right: 176px; }
   .folder-body { transform: scale(0.85); }
   .notepad-body { transform: scale(0.85) rotate(-4deg); }
 }
@@ -1246,6 +1251,8 @@ button, input, select, textarea { font: inherit; color: inherit; }
 @media (max-width: 900px) {
   .spool { top: auto; bottom: 18px; right: 14px; transform: none; }
   .spool-body { transform: scale(0.8); }
+  /* va acá (después de la regla base de .folder-btn) para que gane en el celular */
+  .folder-btn { top: auto; bottom: 22px; right: 176px; }
 }
 
 .thread-menu {

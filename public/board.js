@@ -65,7 +65,17 @@ function toast(msg) {
 
 // ---------- Estado ----------
 
+// Cada pedido de estado lleva un número. Si llega una respuesta más vieja que la
+// última aplicada, se descarta; y una pista guardada hace un instante no se pisa
+// con datos pedidos antes de que ese guardado terminara.
+let loadSeq = 0;
+let appliedSeq = 0;
+let viewSeq = 0;
+const savedAtSeq = new Map(); // id -> loadSeq al terminar su último guardado
+const isStale = (id) => (savedAtSeq.get(id) || 0) >= viewSeq;
+
 async function load() {
+  const seq = ++loadSeq;
   let s;
   try {
     const r = await fetch('/api/state', { credentials: 'same-origin' });
@@ -74,6 +84,9 @@ async function load() {
   } catch {
     return; // sin conexión: se reintenta en el próximo ciclo
   }
+  if (seq < appliedSeq) return; // llegó tarde: ya se mostró algo más nuevo
+  appliedSeq = seq;
+  viewSeq = seq;
   clockOffset = s.serverNow - Date.now();
   role = s.role;
   unlockAt = s.unlockAt ? new Date(s.unlockAt).getTime() : null;
@@ -166,7 +179,8 @@ function showBoard(docs) {
     seen.add(d.id);
     const sig = JSON.stringify(d);
     const prev = rendered.get(d.id);
-    if (prev && (prev.sig === sig || unsaved.has(d.id))) continue; // no pisar un movimiento que se está guardando
+    // no pisar un movimiento que se está guardando (ni con datos pedidos antes de guardarlo)
+    if (prev && (prev.sig === sig || unsaved.has(d.id) || isStale(d.id))) continue;
     const el = buildDoc(d);
     const becameVisible = !prev || (prev.doc.pending && !d.pending);
     if (!firstRender && becameVisible) el.classList.add('appear');
@@ -637,20 +651,31 @@ const DRAG_THRESHOLD = 6;
 
 const saveTimers = new Map();
 const unsaved = new Set();
-function saveLayout(r) {
+// Qué cambió además de la posición ('w' tamaño, 'rot' rotación). Mover una pista
+// manda solo la posición: así no pisa el tamaño que otro acaba de cambiar.
+const changedFields = new Map();
+function saveLayout(r, changed = []) {
   r.sig = JSON.stringify(r.doc);
   unsaved.add(r.doc.id);
+  const pending = changedFields.get(r.doc.id) || new Set();
+  changed.forEach((f) => pending.add(f));
+  changedFields.set(r.doc.id, pending);
   clearTimeout(saveTimers.get(r.doc.id));
   saveTimers.set(r.doc.id, setTimeout(async () => {
     const { x, y, z, rot, w } = r.doc;
     const isNote = r.type === 'note';
+    const fields = changedFields.get(r.doc.id) || new Set();
+    changedFields.delete(r.doc.id);
+    const body = { x, y, z };
+    if (!isNote && fields.has('w')) body.w = w; // tamaño: cualquiera
+    if (!isNote && fields.has('rot') && role === 'admin') body.rot = rot; // rotación: solo el admin
     const res = await fetch(isNote ? '/api/notes/' + r.doc.id : '/api/layout/' + r.doc.id, {
       method: isNote ? 'PATCH' : 'POST',
       headers: { 'Content-Type': 'application/json' },
-      // jugadores: posición y tamaño; el admin además la rotación
-      body: JSON.stringify(isNote ? { x, y, z } : role === 'admin' ? { x, y, z, rot, w } : { x, y, z, w }),
+      body: JSON.stringify(body),
     }).catch(() => null);
     if (!res || !res.ok) toast('No se pudo guardar la posición');
+    savedAtSeq.set(r.doc.id, loadSeq);
     unsaved.delete(r.doc.id);
   }, 300));
 }
@@ -846,29 +871,55 @@ const MAX_W = 60;
 
 const resizable = (r) => r && r.type !== 'note' && !(r.doc.pending && !r.doc.kind);
 
-function resizeDoc(r, dir) {
-  const w = Math.round((r.doc.w + dir * SIZE_STEP) * 10) / 10;
-  r.doc.w = Math.min(MAX_W, Math.max(MIN_W, w));
-  placeDoc(r.el, r.doc);
-  keepInside(r);
-  saveLayout(r);
+// ¿La pista entra completa en el corcho (sin pisar el marco)? Con un 10 % de
+// margen para la animación de "levantarse" al pasarle el mouse.
+function fitsInCork(el) {
+  const b = $('board');
+  return el.offsetWidth * 1.1 <= b.clientWidth * (1 - (2 * FRAME_X) / 100)
+    && el.offsetHeight * 1.1 <= b.clientHeight * (1 - (2 * FRAME_Y) / 100);
 }
 
-// La rueda de un mouse da saltos de ~100; la de un trackpad, muchos pasitos chicos:
-// se acumula para que un "clic" de rueda sea un paso de tamaño.
+function resizeDoc(r, dir) {
+  const prev = r.doc.w;
+  const w = Math.round((r.doc.w + dir * SIZE_STEP) * 10) / 10;
+  r.doc.w = Math.min(MAX_W, Math.max(MIN_W, w));
+  if (r.doc.w === prev) return;
+  placeDoc(r.el, r.doc);
+  if (dir > 0 && !fitsInCork(r.el)) { // no se agranda más que el corcho
+    r.doc.w = prev;
+    placeDoc(r.el, r.doc);
+    return;
+  }
+  keepInside(r);
+  saveLayout(r, ['w']);
+}
+
+// Cada gesto de rueda nuevo da un paso enseguida (una rueda lenta en Mac manda
+// eventos de ~4 px). Dentro de un mismo gesto continuo (trackpad, inercia) se
+// acumula, para que no salte de a muchos pasos.
 let wheelAcc = 0;
 let wheelTarget = null;
+let wheelLast = -Infinity;
 $('board').addEventListener('wheel', (e) => {
   const r = docFromEvent(e);
   if (!r || r.type === 'note') return;
   if (e.shiftKey) {
     if (!resizable(r)) return;
     e.preventDefault();
-    if (wheelTarget !== r) { wheelTarget = r; wheelAcc = 0; }
     const unit = e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 300 : 1; // Firefox mide en líneas
-    wheelAcc += (e.deltaY || e.deltaX) * unit;
+    const delta = (e.deltaY || e.deltaX) * unit;
+    if (!delta) return;
+    const fresh = wheelTarget !== r || e.timeStamp - wheelLast > 250;
+    wheelTarget = r;
+    wheelLast = e.timeStamp;
+    if (fresh) {
+      wheelAcc = 0;
+      resizeDoc(r, delta < 0 ? 1 : -1); // rueda hacia arriba: más grande
+      return;
+    }
+    wheelAcc += delta;
     if (Math.abs(wheelAcc) < 50) return;
-    resizeDoc(r, wheelAcc < 0 ? 1 : -1); // rueda hacia arriba: más grande
+    resizeDoc(r, wheelAcc < 0 ? 1 : -1);
     wheelAcc = 0;
     return;
   }
@@ -878,12 +929,14 @@ $('board').addEventListener('wheel', (e) => {
   r.doc.rot = Math.min(45, Math.max(-45, Math.round((r.doc.rot + dir) * 10) / 10));
   placeDoc(r.el, r.doc);
   keepInside(r);
-  saveLayout(r);
+  saveLayout(r, ['rot']);
 }, { passive: false });
 
 // Con el teclado: la pista que está bajo el mouse (o la que tiene el foco)
 let lastPointer = null;
 document.addEventListener('pointermove', (e) => { lastPointer = { x: e.clientX, y: e.clientY }; }, { passive: true });
+// si el mouse sale de la ventana, se olvida dónde estaba (vale la pista con foco)
+document.addEventListener('pointerout', (e) => { if (!e.relatedTarget) lastPointer = null; }, { passive: true });
 
 document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.metaKey || e.altKey) return; // no pisar el zoom del navegador
@@ -967,7 +1020,7 @@ function showNotes(list) {
     seen.add(n.id);
     const sig = JSON.stringify(n);
     const prev = notesMap.get(n.id);
-    if (prev && (prev.sig === sig || unsaved.has(n.id) || editingNote === prev)) continue;
+    if (prev && (prev.sig === sig || unsaved.has(n.id) || isStale(n.id) || editingNote === prev)) continue;
     const el = buildNote(n);
     if (prev) prev.el.replaceWith(el);
     else board.appendChild(el);
@@ -1108,12 +1161,36 @@ function pinPoint(id, boardRect) {
   return { x: p.left + p.width / 2 - boardRect.left, y: p.top + p.height / 2 - boardRect.top };
 }
 
-function curve(a, b) {
+const f1 = (n) => n.toFixed(1);
+
+function controlPoint(a, b) {
   const dist = Math.hypot(b.x - a.x, b.y - a.y);
   const sag = Math.min(60, dist * 0.06); // el hilo cuelga un poco
-  const cx = (a.x + b.x) / 2;
-  const cy = (a.y + b.y) / 2 + sag;
-  return `M${a.x.toFixed(1)},${a.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 + sag };
+}
+
+function curve(a, b) {
+  const c = controlPoint(a, b);
+  return `M${f1(a.x)},${f1(a.y)} Q${f1(c.x)},${f1(c.y)} ${f1(b.x)},${f1(b.y)}`;
+}
+
+// Tramo central del hilo (sin los extremos que llegan a las chinches)
+function middleOfCurve(a, b, gap) {
+  const c = controlPoint(a, b);
+  const t0 = Math.min(0.4, gap / Math.max(1, Math.hypot(b.x - a.x, b.y - a.y)));
+  const t1 = 1 - t0;
+  const at = (t) => ({
+    x: (1 - t) ** 2 * a.x + 2 * (1 - t) * t * c.x + t * t * b.x,
+    y: (1 - t) ** 2 * a.y + 2 * (1 - t) * t * c.y + t * t * b.y,
+  });
+  const p0 = at(t0);
+  const p1 = at(t1);
+  // punto de control del tramo [t0, t1] de una curva cuadrática
+  const q = {
+    x: p0.x + (t1 - t0) * ((1 - t0) * (c.x - a.x) + t0 * (b.x - c.x)),
+    y: p0.y + (t1 - t0) * ((1 - t0) * (c.y - a.y) + t0 * (b.y - c.y)),
+  };
+  return `M${f1(p0.x)},${f1(p0.y)} Q${f1(q.x)},${f1(q.y)} ${f1(p1.x)},${f1(p1.y)}`;
 }
 
 function drawThreads() {
@@ -1147,6 +1224,9 @@ function drawThreads() {
     g.appendChild(svgEl('path', { d: l.d, class: 't-hi', 'stroke-width': w * 0.35 }));
     g.appendChild(svgEl('circle', { cx: l.a.x, cy: l.a.y, r: w * 0.9, class: 'knot' }));
     g.appendChild(svgEl('circle', { cx: l.b.x, cy: l.b.y, r: w * 0.9, class: 'knot' }));
+    // franja fina para tocar el hilo aunque pase por encima de pistas (solo el
+    // tramo central: cerca de las chinches, el click es para la pista)
+    g.appendChild(svgEl('path', { d: middleOfCurve(l.a, l.b, 34), class: 't-hit', 'data-id': l.id, 'stroke-width': Math.max(7, w * 2.6) }));
     svg.appendChild(g);
     hitSvg.appendChild(svgEl('path', { d: l.d, 'data-id': l.id, 'stroke-width': Math.max(14, w * 6) }));
   }
@@ -1222,7 +1302,8 @@ document.addEventListener('keydown', (e) => {
 
 // Cortar un hilo: click sobre el hilo
 let threadToCut = null;
-hitSvg.addEventListener('click', (e) => {
+const THREAD_HIT = '.thread-hits path[data-id], .threads .t-hit';
+const onThreadClick = (e) => {
   const hit = e.target.closest('path[data-id]');
   if (!hit) return;
   e.stopPropagation();
@@ -1231,20 +1312,23 @@ hitSvg.addEventListener('click', (e) => {
   menu.style.left = e.clientX + 'px';
   menu.style.top = e.clientY + 'px';
   menu.classList.remove('hidden');
-});
-document.addEventListener('pointerdown', (e) => {
-  if (!e.target.closest('#threadMenu') && !e.target.closest('.thread-hits path')) $('threadMenu').classList.add('hidden');
-});
-// resaltar el hilo que está bajo el mouse (se recuerda aunque el tablero se redibuje)
-const markThread = (e, on) => {
-  const hit = e.target.closest('path[data-id]');
-  if (!hit) return;
-  hoveredThread = on ? hit.dataset.id : null;
-  const g = svg.querySelector(`g[data-id="${CSS.escape(hit.dataset.id)}"]`);
-  if (g) g.classList.toggle('hover', on);
 };
-hitSvg.addEventListener('pointerover', (e) => markThread(e, true));
-hitSvg.addEventListener('pointerout', (e) => markThread(e, false));
+hitSvg.addEventListener('click', onThreadClick);
+svg.addEventListener('click', onThreadClick);
+document.addEventListener('pointerdown', (e) => {
+  if (!e.target.closest('#threadMenu') && !e.target.closest(THREAD_HIT)) $('threadMenu').classList.add('hidden');
+});
+// Resaltar el hilo que está bajo el mouse. Se calcula con lo que hay debajo del
+// puntero en cada movimiento (así no queda pegado si el hilo se redibuja).
+document.addEventListener('pointerover', (e) => {
+  const hit = e.target.closest && e.target.closest(THREAD_HIT);
+  const id = hit ? hit.dataset.id : null;
+  if (id === hoveredThread) return;
+  hoveredThread = id;
+  svg.querySelectorAll('g.hover').forEach((g) => g.classList.remove('hover'));
+  const g = id && svg.querySelector(`g[data-id="${CSS.escape(id)}"]`);
+  if (g) g.classList.add('hover');
+});
 $('cutThread').addEventListener('click', async () => {
   $('threadMenu').classList.add('hidden');
   if (!threadToCut) return;

@@ -158,7 +158,9 @@
     // (si no, la primera letra se perdía y la clave salía mal)
     input.focus();
     document.addEventListener('keydown', (e) => {
-      if (document.activeElement === input || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      // solo si el foco no está en ningún lado (si está en el botón, que el botón maneje sus teclas)
+      if (document.activeElement && document.activeElement !== document.body) return;
       if (e.key.length === 1 || e.key === 'Enter') input.focus();
     }, true);
 
@@ -179,21 +181,24 @@
     }
 
     let busy = false;
+    let retry = false; // Enter apretado mientras volvía otro intento
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (busy) return;
+      if (busy) { retry = true; return; }
       busy = true;
+      const sent = input.value;
       try {
         const r = await fetch('/api/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: input.value }),
+          body: JSON.stringify({ password: sent }),
         });
         const data = await r.json().catch(() => ({}));
         if (r.status === 401) throw new Error('Acceso denegado');
         // Cualquier otra cosa no es la clave: es el servidor (se ve distinto para no confundir)
         if (!r.ok) throw Object.assign(new Error('Falla del servidor'), { detail: r.status + ' ' + (data.error || '') });
         if (data.token) memisSession.set(data.token);
+        retry = false;
         go(data.role);
       } catch (err) {
         if (err.detail || err.name === 'TypeError') console.error('Ingreso:', err.detail || err.message);
@@ -204,9 +209,14 @@
         }
         slot.classList.add('shake');
         denied.classList.add('show');
-        input.value = '';
+        // borrar solo si no se siguió escribiendo mientras volvía la respuesta
+        if (input.value === sent) input.value = '';
       } finally {
         busy = false;
+        if (retry) {
+          retry = false;
+          if (input.value) form.requestSubmit();
+        }
       }
     });
   </script>
