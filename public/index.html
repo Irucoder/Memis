@@ -116,6 +116,33 @@
       100% { opacity: 0; transform: translate(-50%, -50%) rotate(-9deg) scale(1); }
     }
 
+    /* Tintero y pincel (tinta.js): una capa encima de la portada */
+    .tinta {
+      position: fixed;
+      inset: 0;
+      z-index: 2;
+      overflow: hidden;
+      pointer-events: none;
+    }
+    .tinta.cargando { visibility: hidden; }
+    .tinta > *, .t-pincel, .t-boton { position: absolute; left: 0; top: 0; }
+    .t-tintero, .t-limpia, .t-lienzo { transform-origin: 0 0; }
+    .t-pincel-wrap { width: 0; height: 0; will-change: transform; }
+    .t-pincel { max-width: none; user-select: none; -webkit-user-drag: none; }
+    .t-boton {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 999px;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tinta.pintando .t-boton { cursor: default; }
+    .t-boton:focus { outline: none; }
+    .t-boton:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.55); outline-offset: 2px; }
+
     .sr-only {
       position: absolute; width: 1px; height: 1px; overflow: hidden;
       clip: rect(0 0 0 0); white-space: nowrap;
@@ -137,8 +164,10 @@
     </form>
     <div class="denied" id="denied" role="alert">Acceso denegado</div>
   </main>
+  <div class="tinta cargando" id="tinta"></div>
 
   <script src="/auth.js"></script>
+  <script src="/tinta.js" defer></script>
   <script>
     const form = document.getElementById('login');
     const input = document.getElementById('password');
@@ -151,6 +180,8 @@
     document.addEventListener('mousedown', (e) => {
       if (e.target === input) return;
       e.preventDefault(); // que el click no le saque el foco a la casilla
+      // el pincel no: en el celular abriría el teclado y taparía la tinta
+      if (e.target.closest && e.target.closest('.t-boton')) return;
       input.focus();
     });
 

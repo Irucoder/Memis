@@ -21,6 +21,7 @@ Los documentos y la configuración se guardan en **Netlify Blobs**, el almacenam
 ## Cómo se ve
 
 - **Portada** (`public/fondo.webp`): la carpeta del Club de Memis; la clave se escribe en la etiqueta blanca vacía y se confirma con Enter.
+- **Tintero (guiño)**: al tocar el pincel de la portada, se levanta, se moja en el tintero y pasa tinta roja por el rincón; como en la pista real (óleo pastel blanco + tinta), aparece la palabra **"memi"** escrita a mano. En el celular el tintero se acomoda arriba a la derecha, sobre la carpeta. Se ve hasta que se recarga la página y no interfiere con la clave. Las imágenes están en `public/tinta/` y la animación en `public/tinta.js`; si se cambia `fondo.webp`, hay que regenerar esos recortes.
 - **Tablero** (`public/marco.webp` + `public/corcho-centro.webp`): un corcho con marco bajo la lámpara, con las pistas clavadas con chinches. Proporción 2,03 : 1, ~85 % del ancho de la pantalla, centrado bajo la lámpara y completo sin bajar; el marco se arma con los bordes de la foto para que no se deforme.
 - **Hilo rojo**: a la derecha hay un carretel. Tocándolo, cada jugador puede unir dos pistas con hilo (tocar una y después la otra). Tocar un hilo permite cortarlo. Los hilos se guardan en el servidor, los ven todos los jugadores y no se borran al cargar nueva evidencia. Desde el panel admin se ve cuántos hay y se pueden borrar todos.
 
