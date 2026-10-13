@@ -92,6 +92,7 @@ function renderSettings() {
 function renderDesk() {
   const desk = state.desk || { placed: 0, moved: 0, total: 20 };
   const visible = state.settings.puzzleVisible !== false;
+  $('deskEnabled').checked = state.settings.deskEnabled === true;
   $('puzzleVisible').checked = visible;
   const done = desk.placed >= desk.total;
   $('puzzleStatus').textContent = `${desk.placed} de ${desk.total} piezas en su lugar` +
@@ -118,6 +119,10 @@ function renderDesk() {
   el.textContent = `🔐 Adentro del cryptex: ${parts.join(' y ')} · ${how}.`;
 }
 
+$('deskEnabled').addEventListener('change', (e) => saveSettings(
+  { deskEnabled: e.target.checked },
+  e.target.checked ? 'Escritorio prendido: se entra a la vista con el escritorio' : 'Escritorio apagado: se entra directo al tablero'
+));
 $('puzzleVisible').addEventListener('change', (e) => saveSettings(
   { puzzleVisible: e.target.checked },
   e.target.checked ? 'El rompecabezas está en el escritorio' : 'Rompecabezas guardado: no se ve en el escritorio'

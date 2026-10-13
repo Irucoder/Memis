@@ -356,7 +356,8 @@
   // ---------- Lo llama board.js con cada /api/state ----------
   function update(s) {
     const wasLocked = locked;
-    locked = !!s.locked;
+    // cerrado (cuenta regresiva) o escritorio apagado desde el panel: el tablero, como siempre
+    locked = !!s.locked || !(s.desk && s.desk.enabled);
     if (locked) {
       desk.classList.add('hidden');
       body.classList.remove('vista-escena', 'vista-tablero', 'vista-escritorio');
