@@ -117,22 +117,45 @@
   filter: drop-shadow(0 16px 14px rgba(0, 0, 0, 0.55)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6)) brightness(1.08);
 }
 .esc-cryptex:focus-visible { outline: 2px solid rgba(255, 236, 190, 0.7); outline-offset: 6px; border-radius: 12px; }
-/* abierto: asoma el pergamino que tenía adentro */
-.esc-pergamino {
-  display: none;
+/* lo que salió del cryptex: pergaminos enrollados al lado */
+.esc-pergaminos { /* entre las piezas de la derecha y el cryptex */
   position: absolute;
-  left: 18%;
-  top: -24%;
-  width: 52%;
-  height: 26%;
-  border-radius: 40% / 50%;
-  background:
-    linear-gradient(90deg, rgba(90, 60, 30, 0.45), transparent 12%, transparent 88%, rgba(90, 60, 30, 0.45)),
-    linear-gradient(180deg, #efe1bd, #d9c393 60%, #b99a62);
-  box-shadow: inset 0 -3px 6px rgba(80, 50, 20, 0.35), 0 6px 8px rgba(0, 0, 0, 0.45);
-  transform: rotate(4deg);
+  left: 74%;
+  top: 63%;
+  z-index: 1;
+  display: flex;
+  gap: 1%;
+  width: 24%;
 }
-.esc-cryptex.abierto .esc-pergamino { display: block; }
+.esc-pergamino {
+  position: relative;
+  width: 46%;
+  aspect-ratio: 3.2;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 40% / 50%;
+  cursor: var(--lupa);
+  background:
+    linear-gradient(90deg, rgba(90, 60, 30, 0.5), transparent 14%, transparent 86%, rgba(90, 60, 30, 0.5)),
+    linear-gradient(180deg, #f1e4c2, #dcc697 60%, #b99a62);
+  box-shadow: inset 0 -3px 6px rgba(80, 50, 20, 0.35), 0 6px 8px rgba(0, 0, 0, 0.45);
+  transform: rotate(calc(-6deg + var(--i, 0) * 9deg));
+  transition: transform 0.2s;
+}
+.esc-pergamino::after { /* cinta roja con lacre */
+  content: '';
+  position: absolute;
+  left: 46%;
+  top: -8%;
+  width: 9%;
+  height: 116%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #8f1d1d, #5e0f10);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.15);
+}
+.vista-escritorio .esc-pergamino:hover { transform: rotate(calc(-6deg + var(--i, 0) * 9deg)) translateY(-3px) scale(1.05); }
+.esc-pergamino:focus-visible { outline: 2px solid rgba(255, 236, 190, 0.8); outline-offset: 3px; }
 .esc-etiqueta {
   position: absolute;
   left: 50%;

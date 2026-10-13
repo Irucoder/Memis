@@ -15,7 +15,7 @@
   // El escritorio mide 1600 x 1000 "unidades"; todo lo de arriba se ubica en esas unidades
   const UNI = { w: 1600, h: 1000 };
   const TRAY = { x: 522, y: 80, w: 555, h: 840 };                                   // donde va armado
-  const ZONES = [{ x: 40, y: 50, w: 440, h: 900 }, { x: 1120, y: 50, w: 440, h: 610 }]; // donde arrancan las piezas
+  const ZONES = [{ x: 40, y: 50, w: 440, h: 900 }, { x: 1120, y: 50, w: 440, h: 560 }]; // donde arrancan las piezas
   const norm = (r) => ({ x: r.x / UNI.w, y: r.y / UNI.h, w: r.w / UNI.w, h: r.h / UNI.h });
   const POEMA = { file: '/escritorio/poema.webp', title: 'Te encontré en los detalles' };
   const DEPTH_FRONT = 0.93; // en la vista general, el borde de adelante del escritorio queda a esta altura de la pantalla
@@ -136,7 +136,7 @@
     $('sceneHint').classList.toggle('hidden', view !== 'escena');
     $('backBtn').classList.toggle('hidden', view === 'escena');
     $('goDesk').tabIndex = view === 'escena' ? 0 : -1;
-    if (puzzle) puzzle.setInteractive(view === 'escritorio');
+    if (puzzle) puzzle.setInteractive(false); // se agarran recién con el escritorio quieto (settle)
     if (view !== 'escritorio') closeCryptex();
     settleTimer = setTimeout(settle, anim ? MOVE_MS : 0);
   }
@@ -148,6 +148,7 @@
     if (view === 'tablero') camara.style.transform = '';
     if (view === 'escritorio') {
       desk.classList.add('listo');
+      if (puzzle) puzzle.setInteractive(true);
       desk.scrollLeft = (desk.scrollWidth - desk.clientWidth) / 2;
     }
   }
@@ -203,7 +204,7 @@
       zones: ZONES.map(norm),
       seed: 'poema-1',
       state: st,
-      interactive: view === 'escritorio',
+      interactive: view === 'escritorio' && desk.classList.contains('listo'),
       onMove: sendPiece,
       onDone: () => {
         if (!doneShown && view === 'escritorio') B.toast('¡Rompecabezas armado! Tocalo para leerlo.');
@@ -217,19 +218,40 @@
   // ---------- Cryptex ----------
   // abierto: ni cerrado con clave (al jugador le llega `locked`; al admin, completo con `sealed`) ni por venir
   const isOpen = (d) => !!d && !d.locked && !d.sealed && !d.pending;
+  const isClosed = (d) => !!d && (d.locked || d.sealed) && !d.pending;
+  let inside = [];      // pistas adentro del cryptex, en el orden del servidor
+  let activeId = null;  // la pista para la que se abrió el cryptex de cerca
+  const byId = (id) => inside.find((d) => d.id === id) || null;
+  // la que espera en el escritorio: primero la que sigue cerrada (se abren de a una)
+  const current = () => inside.find(isClosed) || inside.find(isOpen) || inside[0] || null;
 
   function syncCryptex(docs) {
-    // si hay varias, primero la que sigue cerrada (se abren de a una)
-    const inside = docs.filter((d) => d.spot === 'cryptex');
-    cryptexDoc = inside.find((d) => d.locked || d.sealed) || inside[0] || null;
-    if (cryptexDoc && cryptexDoc.rings) ringsOf.set(cryptexDoc.id, cryptexDoc.rings);
+    inside = docs.filter((d) => d.spot === 'cryptex');
+    for (const d of inside) if (d.rings) ringsOf.set(d.id, d.rings);
+    cryptexDoc = current();
     const d = cryptexDoc;
-    $('cryptexObj').classList.toggle('abierto', isOpen(d));
+    const opened = inside.filter(isOpen);
+    $('cryptexObj').classList.toggle('abierto', !inside.some(isClosed) && opened.length > 0);
     const tag = $('cryptexTag');
     const waiting = d && d.pending && !d.kind;
     tag.textContent = waiting ? 'Se activa el ' + B.whenText(d.publishAt) : '';
     tag.classList.toggle('hidden', !waiting);
-    if (cx && isOpen(d)) cx.setOpen(true);
+    // lo que ya salió del cryptex queda al lado, enrollado: se toca y se lee
+    const box = $('cryptexScrolls');
+    const sig = opened.map((x) => x.id).join(',');
+    if (box.dataset.sig !== sig) {
+      box.dataset.sig = sig;
+      box.replaceChildren(...opened.slice(0, 3).map((doc, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'esc-pergamino';
+        b.style.setProperty('--i', i);
+        b.setAttribute('aria-label', 'Pergamino del cryptex' + (doc.title ? ': ' + doc.title : ''));
+        b.addEventListener('click', () => { if (view === 'escritorio') B.openLightbox(byId(doc.id) || doc); });
+        return b;
+      }));
+    }
+    if (cx && activeId && isOpen(byId(activeId))) cx.setOpen(true);
   }
 
   // si la foto del cryptex no carga, mejor no mostrar un ícono roto
@@ -251,7 +273,8 @@
   function openCryptex() {
     if (!window.Cryptex) return B.toast('El cryptex todavía no está listo');
     closeCryptex(true);
-    const d = cryptexDoc;
+    const d = current();
+    activeId = d ? d.id : null;
     const open = isOpen(d);
     $('cxHint').textContent = open
       ? 'Está abierto: tocá el pergamino para leerlo.'
@@ -262,18 +285,18 @@
       label: 'Cryptex',
       onTry,
       onScroll: () => {
-        const doc = cryptexDoc;
+        const doc = byId(activeId);
         if (!isOpen(doc)) return;
         closeCryptex();
         B.openLightbox(doc);
       },
     });
     $('cxModal').classList.add('open');
-    setTimeout(() => cx && cx.focus(), 60);
+    cx.focus();
   }
 
   async function onTry(word) {
-    const d = cryptexDoc;
+    const d = byId(activeId);
     if (!d || d.pending) return false;
     if (isOpen(d)) return true;
     const res = await fetch('/api/unlock/' + d.id, {
@@ -294,6 +317,7 @@
     m.classList.remove('open');
     const old = cx;
     cx = null;
+    activeId = null;
     if (old) setTimeout(() => old.destroy(), now ? 0 : 320);
   }
   $('cxClose').addEventListener('click', () => closeCryptex());

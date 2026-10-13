@@ -177,7 +177,10 @@
   transform: translateY(-3px);
   filter: drop-shadow(0 14px 12px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 14px rgba(255, 220, 150, 0.45));
 }
-.crx-pergamino:focus-visible { outline: 2px solid rgba(255, 226, 160, 0.9); outline-offset: 6px; border-radius: 14px; }
+.crx-pergamino:focus-visible { outline: none; }
+.crx-pergamino:focus-visible svg {
+  filter: drop-shadow(0 14px 12px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 2px rgba(255, 236, 190, 1)) drop-shadow(0 0 10px rgba(255, 214, 140, 0.85));
+}
 .crx.abierto .crx-pergamino .crx-brillo { animation: crx-llamado 2.8s ease-in-out 1.4s infinite; }
 @keyframes crx-llamado {
   0%, 100% { opacity: 0; }
