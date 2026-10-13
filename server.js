@@ -131,9 +131,12 @@ http.createServer(async (req, res) => {
   if (!url.pathname.startsWith('/api/') && !url.pathname.startsWith('/files/')) return serveStatic(req, res, url);
 
   const hasBody = req.method !== 'GET' && req.method !== 'HEAD';
+  // la dirección de quien pide (para frenar a quien prueba claves); no se acepta la que mande el navegador
+  const inHeaders = { ...req.headers, 'x-memis-ip': req.socket.remoteAddress || '' };
+  delete inHeaders['x-nf-client-connection-ip'];
   const request = new Request(url, {
     method: req.method,
-    headers: req.headers,
+    headers: inHeaders,
     body: hasBody ? Readable.toWeb(req) : undefined,
     duplex: 'half',
   });

@@ -290,6 +290,7 @@
   color: rgba(240, 228, 200, 0.9);
 }
 .cx-ayuda:empty { display: none; }
+.cx-host.vacio .crx-pergamino { display: none; } /* abierto y vacío: no hay pergamino */
 
 @media (prefers-reduced-motion: reduce) {
   .camara.moviendo, .escritorio.moviendo .esc-plano { transition-duration: 0.01s; }

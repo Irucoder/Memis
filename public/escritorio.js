@@ -240,13 +240,17 @@
   // la que espera en el escritorio: primero la que sigue cerrada (se abren de a una)
   const current = () => inside.find(isClosed) || inside.find(isOpen) || inside[0] || null;
 
-  function syncCryptex(docs) {
+  let status = { status: 'vacio' }; // cómo está el cryptex cuando adentro no queda nada que mostrar
+  const emptyNow = () => !inside.length;
+  function syncCryptex(docs, st) {
+    if (st) status = st;
     inside = docs.filter((d) => d.spot === 'cryptex');
     for (const d of inside) if (d.rings) ringsOf.set(d.id, d.rings);
     cryptexDoc = current();
     const d = cryptexDoc;
     const opened = inside.filter(isOpen);
-    $('cryptexObj').classList.toggle('abierto', !inside.some(isClosed) && opened.length > 0);
+    // abierto si lo de adentro ya se abrió, o si ya se abrió y se vació (lo pasaron al tablero)
+    $('cryptexObj').classList.toggle('abierto', inside.length ? !inside.some(isClosed) && opened.length > 0 : status.status === 'abierto');
     const tag = $('cryptexTag');
     const waiting = d && d.pending && !d.kind;
     tag.textContent = waiting ? 'Se activa el ' + B.whenText(d.publishAt) : '';
@@ -293,12 +297,19 @@
     closeCryptex(true);
     const d = current();
     activeId = d ? d.id : null;
-    const open = isOpen(d);
-    $('cxHint').textContent = open
-      ? 'Está abierto: tocá el pergamino para leerlo.'
-      : (d && d.hint) || 'Alineá las letras correctas y tirá de las tapas para abrirlo.';
+    // sin nada adentro: o ya se abrió y se vació, o todavía no guarda nada
+    const emptied = emptyNow() && status.status === 'abierto';
+    const open = isOpen(d) || emptied;
+    $('cxHost').classList.toggle('vacio', emptied);
+    $('cxHint').textContent = emptied
+      ? 'Ya se abrió y está vacío: lo que guardaba quedó en el tablero o en el archivo.'
+      : open
+        ? 'Está abierto: tocá el pergamino para leerlo.'
+        : emptyNow() && status.status === 'vacio'
+          ? 'Por ahora el cryptex no guarda nada.'
+          : (d && d.hint) || 'Alineá las letras correctas y tirá de las tapas para abrirlo.';
     cx = window.Cryptex.mount($('cxHost'), {
-      rings: (d && ringsOf.get(d.id)) || 5,
+      rings: (d && ringsOf.get(d.id)) || (emptied && status.rings) || 5,
       open,
       label: 'Cryptex',
       onTry,
@@ -358,7 +369,7 @@
     desk.classList.remove('hidden');
     if (wasLocked || view === null) setView(viewFromHash(), { push: false, instant: true });
     syncPuzzle(s.desk || {});
-    syncCryptex(s.docs || []);
+    syncCryptex(s.docs || [], (s.desk || {}).cryptex);
   }
 
   window.memisDesk = { update, setView: (v) => setView(v) };
