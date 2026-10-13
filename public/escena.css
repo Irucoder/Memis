@@ -11,6 +11,8 @@
 .camara.moviendo {
   transition: transform 0.85s cubic-bezier(0.55, 0.05, 0.25, 1);
 }
+/* durante el zoom no se toca nada (un doble clic no abre lo que queda debajo) */
+.camara.moviendo, .escritorio.moviendo .esc-plano { pointer-events: none; }
 /* En la vista general y en el escritorio el corcho no se recorre: se ve entero */
 .vista-escena .board-scroll,
 .vista-escritorio .board-scroll { overflow: visible; }
@@ -124,6 +126,7 @@
   top: 63%;
   z-index: 1;
   display: flex;
+  flex-wrap: wrap;
   gap: 1%;
   width: 24%;
 }

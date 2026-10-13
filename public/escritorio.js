@@ -17,7 +17,7 @@
   const TRAY = { x: 522, y: 80, w: 555, h: 840 };                                   // donde va armado
   const ZONES = [{ x: 40, y: 50, w: 440, h: 900 }, { x: 1120, y: 50, w: 440, h: 560 }]; // donde arrancan las piezas
   const norm = (r) => ({ x: r.x / UNI.w, y: r.y / UNI.h, w: r.w / UNI.w, h: r.h / UNI.h });
-  const POEMA = { file: '/escritorio/poema.webp', title: 'Te encontré en los detalles' };
+  const POEMA = { title: 'Te encontré en los detalles' }; // la imagen la da el servidor (s.desk.image)
   const DEPTH_FRONT = 0.93; // en la vista general, el borde de adelante del escritorio queda a esta altura de la pantalla
   const TILT = 64;          // inclinación del escritorio en la vista general (grados)
   const MOVE_MS = 900;
@@ -110,7 +110,10 @@
     if (locked || next === view) return;
     const first = view === null;
     const sc = $('boardView');
-    if (view === 'tablero') boardScroll = sc.scrollLeft;
+    if (view === 'tablero') {
+      boardScroll = sc.scrollLeft;
+      B.leaveBoard(); // hilo, acomodar, archivo: quedan apagados
+    }
     view = next;
     if (push) history.pushState({ vista: next }, '', next === 'escena' ? location.pathname + location.search : '#' + next);
     body.classList.remove('vista-escena', 'vista-tablero', 'vista-escritorio');
@@ -153,10 +156,13 @@
     }
   }
 
+  let goingBack = false; // un doble clic en "Volver" no tiene que salir de la página
   function back() {
-    if (view === 'escena') return;
-    if (history.state && history.state.vista) history.back();
-    else {
+    if (view === 'escena' || goingBack) return;
+    if (history.state && history.state.vista) {
+      goingBack = true;
+      history.back();
+    } else {
       history.replaceState(null, '', location.pathname + location.search);
       setView('escena', { push: false });
     }
@@ -166,7 +172,10 @@
   $('editBtn').addEventListener('click', () => setView('tablero')); // acomodar se hace de cerca
   $('goDesk').addEventListener('click', () => setView('escritorio'));
   $('backBtn').addEventListener('click', back);
-  addEventListener('popstate', () => { if (!locked) setView(viewFromHash(), { push: false }); });
+  addEventListener('popstate', () => {
+    goingBack = false;
+    if (!locked) setView(viewFromHash(), { push: false });
+  });
   addEventListener('resize', () => {
     if (locked || view === null) return;
     place();
@@ -195,7 +204,13 @@
     $('puzzleHost').classList.toggle('hidden', !visible);
     if (!visible || !window.Rompecabezas) return;
     const st = d.puzzle || {};
-    if (puzzle) { puzzle.update(st); return; }
+    if (d.image) POEMA.file = d.image;
+    if (!POEMA.file) return;
+    if (puzzle) {
+      puzzle.update(st);
+      if (!puzzle.isDone()) doneShown = false; // si lo desarmaron, al volver a armarlo se avisa de nuevo
+      return;
+    }
     puzzle = window.Rompecabezas.mount($('puzzleHost'), {
       image: POEMA.file,
       cols: 4,
@@ -241,7 +256,7 @@
     const sig = opened.map((x) => x.id).join(',');
     if (box.dataset.sig !== sig) {
       box.dataset.sig = sig;
-      box.replaceChildren(...opened.slice(0, 3).map((doc, i) => {
+      box.replaceChildren(...opened.map((doc, i) => {
         const b = document.createElement('button');
         b.type = 'button';
         b.className = 'esc-pergamino';
@@ -251,7 +266,10 @@
         return b;
       }));
     }
-    if (cx && activeId && isOpen(byId(activeId))) cx.setOpen(true);
+    if (cx && activeId && isOpen(byId(activeId))) {
+      cx.setOpen(true); // lo abrió otro jugador mientras este lo miraba
+      $('cxHint').textContent = 'Está abierto: tocá el pergamino para leerlo.';
+    }
   }
 
   // si la foto del cryptex no carga, mejor no mostrar un ícono roto
@@ -305,6 +323,7 @@
       body: JSON.stringify({ key: word }),
     }).catch(() => null);
     if (!res) { B.toast('Sin conexión'); return false; }
+    if (res.status === 429) { B.toast((await res.json().catch(() => ({}))).error || 'Demasiados intentos'); return false; }
     if (!res.ok) return false;
     await B.load(); // trae lo que hay adentro (ya desbloqueado para todos)
     $('cxHint').textContent = 'Está abierto: tocá el pergamino para leerlo.';

@@ -475,6 +475,14 @@
       return { x: (e.clientX - r.left) / (r.width || 1), y: (e.clientY - r.top) / (r.height || 1) };
     }
 
+    // Un clic en el borde transparente de una pieza (sin pieza debajo) es para lo que hay abajo
+    // (el cryptex, un pergamino): se le pasa.
+    root.addEventListener('click', (e) => {
+      if (!byEl.has(e.target) || pieceAt(e.clientX, e.clientY)) return;
+      const below = document.elementsFromPoint(e.clientX, e.clientY).find((el) => !root.contains(el) && el !== host);
+      if (below && typeof below.click === 'function') { e.stopPropagation(); below.click(); }
+    });
+
     root.addEventListener('pointerdown', (e) => {
       if (!interactive || done || drag || e.button > 0 || !e.isPrimary) return;
       const p = pieceAt(e.clientX, e.clientY);

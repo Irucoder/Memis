@@ -21,6 +21,16 @@
     <div class="camara" id="camara">
     <div class="lamp" aria-hidden="true"><div class="cord"></div><div class="shade"></div><div class="rim"></div><div class="bulb"></div></div>
 
+    <!-- Tablero -->
+    <section class="board-scroll hidden" id="boardView">
+      <div class="board" id="board">
+        <div class="board-empty hidden" id="boardEmpty"><span>EL TABLERO ESTÁ VACÍO… POR AHORA.</span></div>
+        <svg class="thread-hits" id="threadHits" aria-hidden="true"></svg>
+        <svg class="threads" id="threads" aria-hidden="true"></svg>
+      </div>
+    </section>
+    </div>
+
     <header class="topbar">
       <button class="btn small dark volver hidden" id="backBtn" type="button">↩ Volver</button>
       <div class="actions">
@@ -52,16 +62,6 @@
         <p class="when" id="cdWhen"></p>
       </div>
     </section>
-
-    <!-- Tablero -->
-    <section class="board-scroll hidden" id="boardView">
-      <div class="board" id="board">
-        <div class="board-empty hidden" id="boardEmpty"><span>EL TABLERO ESTÁ VACÍO… POR AHORA.</span></div>
-        <svg class="thread-hits" id="threadHits" aria-hidden="true"></svg>
-        <svg class="threads" id="threads" aria-hidden="true"></svg>
-      </div>
-    </section>
-    </div>
 
     <!-- Escritorio: en la vista general se ve en perspectiva abajo del tablero; al acercarse queda de frente -->
     <section class="escritorio hidden" id="deskView" aria-label="Escritorio">

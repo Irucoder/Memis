@@ -20,13 +20,17 @@ const notesMap = new Map(); // id -> { el, sig, doc: nota, type: 'note' }
 const FRAME_X = 0.6;
 const FRAME_Y = 1;
 
-// Zona del corcho en pantalla (sin el marco), que es donde se ubican pistas e hilos
+// Zona del corcho en pantalla (sin el marco), que es donde se ubican pistas e hilos.
+// En la vista general la cámara achica todo: se mide en pantalla con esa escala.
 function corkBox() {
   const b = $('board');
   const r = b.getBoundingClientRect();
-  const left = r.left + b.clientLeft;
-  const top = r.top + b.clientTop;
-  return { left, top, width: b.clientWidth, height: b.clientHeight, right: left + b.clientWidth, bottom: top + b.clientHeight };
+  const k = b.offsetWidth ? r.width / b.offsetWidth : 1;
+  const left = r.left + b.clientLeft * k;
+  const top = r.top + b.clientTop * k;
+  const width = b.clientWidth * k;
+  const height = b.clientHeight * k;
+  return { left, top, width, height, right: left + width, bottom: top + height };
 }
 
 function fitInside(r, x, y) {
@@ -595,8 +599,21 @@ function closeLightbox() {
   $('lbContent').replaceChildren();
 }
 
+// Al salir del tablero (vista general o escritorio) se apagan los modos del corcho
+function leaveBoard() {
+  setThreading(false);
+  if (editing) {
+    editing = false;
+    $('board').classList.remove('editing');
+    $('editBtn').textContent = 'Acomodar';
+    $('editHint').classList.add('hidden');
+  }
+  closeArchive();
+  $('threadMenu').classList.add('hidden');
+}
+
 // Lo que usa el escritorio (escritorio.js)
-window.memisBoard = { openLightbox, closeLightbox, toast, load, moveDoc, whenText, isOpen: () => lightbox.classList.contains('open') };
+window.memisBoard = { openLightbox, closeLightbox, toast, load, moveDoc, whenText, leaveBoard, isOpen: () => lightbox.classList.contains('open') };
 
 $('lbClose').addEventListener('click', closeLightbox);
 lightbox.addEventListener('click', (e) => {
