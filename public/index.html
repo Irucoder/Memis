@@ -144,6 +144,33 @@
     .t-boton:focus { outline: none; }
     .t-boton:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.55); outline-offset: 2px; }
 
+    /* Rompecabezas (portada-puzzle.js): otra capa, debajo de la del tintero */
+    .puzzle {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      overflow: hidden;
+      overflow: clip;
+      pointer-events: none;
+    }
+    .puzzle.cargando, .puzzle.oculto { visibility: hidden; }
+    .p-lienzo, .p-boton { position: absolute; left: 0; top: 0; }
+    .p-lienzo { transform-origin: 0 0; }
+    .p-boton {
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .puzzle.armando .p-boton { cursor: default; }
+    .p-boton:focus { outline: none; }
+    .p-boton:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.55); outline-offset: 2px; }
+
     .sr-only {
       position: absolute; width: 1px; height: 1px; overflow: hidden;
       clip: rect(0 0 0 0); white-space: nowrap;
@@ -166,9 +193,11 @@
     <div class="denied" id="denied" role="alert">Acceso denegado</div>
   </main>
   <div class="tinta cargando" id="tinta"></div>
+  <div class="puzzle cargando" id="puzzle"></div>
 
   <script src="/auth.js"></script>
   <script src="/tinta.js" defer></script>
+  <script src="/portada-puzzle.js" defer></script>
   <script>
     const form = document.getElementById('login');
     const input = document.getElementById('password');
@@ -181,8 +210,8 @@
     document.addEventListener('mousedown', (e) => {
       if (e.target === input) return;
       e.preventDefault(); // que el click no le saque el foco a la casilla
-      // el pincel no: en el celular abriría el teclado y taparía la tinta
-      if (e.target.closest && e.target.closest('.t-boton')) return;
+      // el pincel y el rompecabezas no: en el celular abriría el teclado y los taparía
+      if (e.target.closest && e.target.closest('.t-boton, .p-boton')) return;
       input.focus();
     });
 
