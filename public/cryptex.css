@@ -1,0 +1,227 @@
+/* ---------- Cryptex (widget) ----------
+   El cilindro se dibuja en un canvas (cryptex.js). Acá van las capas de arriba:
+   los anillos invisibles que toman el foco y el arrastre, las flechitas,
+   el botón "Abrir", el aviso y el pergamino que aparece al abrirlo. */
+
+.crx {
+  --crx-laton: #c9a35a;
+  --crx-laton-claro: #f0d595;
+  --crx-laton-oscuro: #5d4420;
+  position: relative;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  color: #f1e6cc;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.crx-escena {
+  position: relative;
+  width: 100%;
+}
+.crx-lienzo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Cada anillo: invisible, encima del dibujo. Se arrastra, gira con la rueda y toma el foco. */
+.crx-anillo {
+  position: absolute;
+  z-index: 2;
+  border-radius: 8px;
+  cursor: grab;
+  touch-action: none;
+  outline: none;
+  transition: box-shadow 0.2s;
+}
+.crx-anillo:hover { box-shadow: inset 0 0 0 999px rgba(255, 236, 190, 0.035); }
+.crx-anillo:focus-visible {
+  box-shadow:
+    0 0 0 2px rgba(255, 226, 160, 0.95),
+    0 0 0 5px rgba(255, 196, 110, 0.22),
+    0 0 18px 4px rgba(255, 210, 130, 0.25);
+}
+.crx.arrastrando, .crx.arrastrando .crx-anillo { cursor: grabbing; }
+
+/* Flechitas arriba y abajo de cada anillo */
+.crx-flecha {
+  position: absolute;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--crx-laton);
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.2s, transform 0.15s, color 0.2s, visibility 0.3s;
+  touch-action: manipulation;
+}
+.crx-flecha svg {
+  width: min(22px, 70%);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
+}
+.crx-flecha:hover { opacity: 1; color: var(--crx-laton-claro); }
+.crx-flecha.arriba:active { transform: translateY(-2px); }
+.crx-flecha.abajo:active { transform: translateY(2px); }
+
+/* Tapas: se pueden tironear hacia afuera para abrir */
+.crx-tapa {
+  position: absolute;
+  z-index: 2;
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+/* Botón "Abrir": una plaquita de latón */
+.crx-pie {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-height: 64px;
+}
+.crx-abrir {
+  position: relative;
+  margin: 0;
+  padding: 9px 26px 8px;
+  border: 1px solid #4a3416;
+  border-radius: 4px;
+  font-family: 'Cinzel', 'Trajan Pro', 'Times New Roman', Georgia, serif;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #2b1b07;
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.55);
+  background:
+    linear-gradient(180deg, rgba(255, 246, 214, 0.55), rgba(255, 246, 214, 0) 38%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, 0.22)),
+    linear-gradient(90deg, #a47c3a, #e2c27d 30%, #c9a053 55%, #e6c886 78%, #9a7232);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 244, 210, 0.75),
+    inset 0 -1px 0 rgba(60, 40, 12, 0.6),
+    0 2px 0 #3a280f,
+    0 6px 14px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  transition: filter 0.2s, transform 0.12s, opacity 0.3s, visibility 0.3s;
+}
+.crx-abrir:hover { filter: brightness(1.08); }
+.crx-abrir:active { transform: translateY(1px); }
+.crx-abrir:focus-visible { outline: 2px solid rgba(255, 226, 160, 0.95); outline-offset: 3px; }
+.crx-abrir:disabled { cursor: progress; filter: saturate(0.6) brightness(0.85); }
+
+.crx-msg {
+  margin: 0;
+  min-height: 1.3em;
+  font-family: 'Special Elite', 'Courier New', monospace;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  color: rgba(240, 214, 170, 0.9);
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.crx-msg.visible { opacity: 1; }
+
+/* Pergamino enrollado (aparece al abrirlo) */
+.crx-pergamino {
+  position: absolute;
+  z-index: 4;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: var(--lupa, zoom-in);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(var(--crx-dx, 0px), var(--crx-dy, 0px)) scale(0.2) rotate(0deg);
+  transform-origin: 50% 50%;
+  transition:
+    transform 0.75s cubic-bezier(0.3, 1.35, 0.5, 1),
+    opacity 0.35s ease-out,
+    visibility 0s linear 0.75s;
+}
+.crx-pergamino svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.55)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+  transition: filter 0.3s, transform 0.25s;
+}
+.crx.abierto .crx-pergamino {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translate(0, 0) scale(1) rotate(-3deg);
+  transition:
+    transform 0.8s cubic-bezier(0.3, 1.35, 0.5, 1) 0.42s,
+    opacity 0.3s ease-out 0.42s,
+    visibility 0s;
+}
+.crx.ya-abierto .crx-pergamino { transition: none; } /* llegó abierto: sin animación */
+.crx-pergamino:hover svg,
+.crx-pergamino:focus-visible svg {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 14px 12px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 14px rgba(255, 220, 150, 0.45));
+}
+.crx-pergamino:focus-visible { outline: 2px solid rgba(255, 226, 160, 0.9); outline-offset: 6px; border-radius: 14px; }
+.crx.abierto .crx-pergamino .crx-brillo { animation: crx-llamado 2.8s ease-in-out 1.4s infinite; }
+@keyframes crx-llamado {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.55; }
+}
+
+/* Abierto: ya no se gira ni se abre */
+.crx.abierto .crx-flecha,
+.crx.abierto .crx-abrir {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.crx.abierto .crx-anillo,
+.crx.abierto .crx-tapa { cursor: default; }
+.crx.probando .crx-anillo,
+.crx.probando .crx-tapa,
+.crx.probando .crx-flecha { cursor: progress; }
+
+/* Solo para lectores de pantalla */
+.crx-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 520px) {
+  .crx-abrir { padding: 8px 20px 7px; font-size: 14px; }
+  .crx-msg { font-size: 13px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crx-pergamino,
+  .crx.abierto .crx-pergamino {
+    transform: none;
+    transition: opacity 0.5s ease-out, visibility 0s;
+  }
+  .crx.abierto .crx-pergamino { transform: rotate(-3deg); }
+  .crx.abierto .crx-pergamino .crx-brillo { animation: none; }
+  .crx-pergamino:hover svg, .crx-pergamino:focus-visible svg { transform: none; }
+}
