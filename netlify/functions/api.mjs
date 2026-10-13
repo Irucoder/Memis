@@ -54,6 +54,7 @@ function getHandler() {
       // Escritorio (piezas del rompecabezas): cada pieza que se suelta se escribe sobre lo último
       readDesk: async () => (await store.get('desk', { type: 'json' })) || {},
       updateDesk: (fn) => updateJSON('desk', fn),
+      updateTries: (fn) => updateJSON('intentos', fn),
       async clearThreads() {
         const { blobs } = await store.list({ prefix: 'threads/' });
         await Promise.all(blobs.map((b) => store.delete(b.key)));

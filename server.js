@@ -19,6 +19,7 @@ const THREADS_FILE = path.join(DATA_DIR, 'threads.json');
 const LAYOUTS_FILE = path.join(DATA_DIR, 'layouts.json');
 const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 const DESK_FILE = path.join(DATA_DIR, 'desk.json'); // escritorio: piezas del rompecabezas
+const TRIES_FILE = path.join(DATA_DIR, 'intentos.json');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -86,6 +87,7 @@ const handle = createHandler(
     updateNotes: (fn) => updateJSON(NOTES_FILE, fn),
     readDesk: () => readJSON(DESK_FILE),
     updateDesk: (fn) => updateJSON(DESK_FILE, fn),
+    updateTries: (fn) => updateJSON(TRIES_FILE, fn),
   },
   {
     passwords: {
