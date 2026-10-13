@@ -11,9 +11,12 @@ function getHandler() {
   const store = getStore({ name: 'memis', consistency: 'strong' });
 
   // Escritura condicional: si dos personas cambian a la vez (mover pistas,
-  // escribir post-its), se reintenta sobre lo último guardado y nadie pisa a nadie.
+  // escribir post-its, soltar piezas), se reintenta sobre lo último guardado y
+  // nadie pisa a nadie. Entre intentos se espera un poquito al azar, así
+  // muchos cambios juntos no vuelven a chocar todos al mismo tiempo.
   async function updateJSON(key, fn) {
-    for (let attempt = 0; attempt < 8; attempt++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, Math.random() * 40 * attempt));
       const current = await store.getWithMetadata(key, { type: 'json' });
       const next = fn((current && current.data) || {});
       const opts = current ? { onlyIfMatch: current.etag } : { onlyIfNew: true };
@@ -48,6 +51,9 @@ function getHandler() {
       updateLayouts: (fn) => updateJSON('layouts', fn),
       readNotes: async () => (await store.get('notes', { type: 'json' })) || {},
       updateNotes: (fn) => updateJSON('notes', fn),
+      // Escritorio (piezas del rompecabezas): cada pieza que se suelta se escribe sobre lo último
+      readDesk: async () => (await store.get('desk', { type: 'json' })) || {},
+      updateDesk: (fn) => updateJSON('desk', fn),
       async clearThreads() {
         const { blobs } = await store.list({ prefix: 'threads/' });
         await Promise.all(blobs.map((b) => store.delete(b.key)));

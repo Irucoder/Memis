@@ -33,6 +33,12 @@
     input:focus, select:focus, textarea:focus { outline: 2px solid rgba(200, 68, 58, 0.5); outline-offset: 0; }
     .switch { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; line-height: 1.4; }
     .switch input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); }
+    .switch:has(input:disabled) { cursor: default; }
+    .help:empty { display: none; }
+    .help.good { color: #7fd99a; }
+    .help.bad { color: #ff9c92; }
+    .meter { height: 6px; max-width: 360px; margin-top: 8px; background: #08111a; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; }
+    .meter span { display: block; height: 100%; width: 0; background: #5fc27e; transition: width 0.4s; }
     .help { font-size: 13px; color: var(--text-dim); margin: 6px 0 0; line-height: 1.45; }
     .tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 3px; overflow: hidden; margin-bottom: 14px; }
     .tabs button { padding: 8px 16px; background: transparent; border: 0; cursor: pointer; color: var(--text-dim); letter-spacing: 0.08em; }
@@ -42,7 +48,7 @@
     .radio-row input { accent-color: var(--accent); }
 
     .doc-list { display: flex; flex-direction: column; gap: 10px; }
-    .doc-item { display: grid; grid-template-columns: 72px 1fr; gap: 14px; padding: 12px; background: #0a141e; border: 1px solid var(--line); border-radius: 3px; }
+    .doc-item { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 14px; padding: 12px; background: #0a141e; border: 1px solid var(--line); border-radius: 3px; }
     .doc-item .thumb { width: 72px; height: 90px; background: var(--paper); display: grid; place-items: center; overflow: hidden; color: var(--ink); font-family: var(--font-type); font-size: 11px; text-align: center; padding: 4px; }
     .doc-item .thumb img { width: 100%; height: 100%; object-fit: cover; }
     .doc-item .top { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
@@ -53,6 +59,8 @@
     .new-toggle input { accent-color: #c8443a; margin: 0; }
     .new-toggle:has(input:checked) { background: #c8443a; border-color: #c8443a; color: #fff; }
     .pill.sched { background: rgba(241, 230, 74, 0.14); color: var(--highlight); }
+    .pill.cryptex { background: rgba(201, 160, 80, 0.16); color: #e2c27d; }
+    @media (max-width: 520px) { .pill { white-space: normal; } } /* en el celular las insignias largas bajan de renglón */
     .doc-item .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 12px; align-items: end; }
     .doc-item .controls .field { margin: 0; }
     .doc-item .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
@@ -67,7 +75,7 @@
     <header>
       <h1>Panel de administración</h1>
       <div class="actions">
-        <a class="btn small dark" href="/tablero">Ver / acomodar tablero</a>
+        <a class="btn small dark" href="/tablero#tablero">Ver / acomodar tablero</a>
         <button class="btn small ghost" id="logoutBtn" type="button">Salir</button>
       </div>
     </header>
@@ -107,6 +115,25 @@
         <button class="btn small danger" id="clearNotes" type="button">Borrar todos los post-its</button>
       </div>
       <p class="help">Los hilos y post-its de los jugadores se guardan aparte: cargar, mover o programar documentos no los borra. Si eliminás un documento, sus hilos dejan de verse.</p>
+    </section>
+
+    <section class="card">
+      <h2>Escritorio</h2>
+      <label class="switch">
+        <input type="checkbox" id="puzzleVisible">
+        <span>Mostrar el rompecabezas del poema en el escritorio.<br>
+        <span class="help">Si está desactivado, el rompecabezas no aparece y nadie puede mover piezas; lo que ya armaron queda guardado para cuando lo vuelvas a mostrar.</span></span>
+      </label>
+      <div class="row" style="margin-top:14px">
+        <div style="flex:1;min-width:220px">
+          <div class="status-line" id="puzzleStatus" style="margin:0"></div>
+          <div class="meter" aria-hidden="true"><span id="puzzleBar"></span></div>
+        </div>
+        <button class="btn small danger" id="resetPuzzle" type="button">Desarmar el rompecabezas</button>
+      </div>
+      <div class="status-line" id="cryptexStatus" style="margin:16px 0 0"></div>
+      <p class="help">El rompecabezas es compartido: todos los jugadores ven las mismas piezas. "Desarmar" vuelve a desparramar todas las piezas para todos.<br>
+      Para guardar una pista adentro del cryptex, al cargarla elegí <strong>Adentro del cryptex (escritorio)</strong> en "Dónde aparece" y ponele una clave: solo letras, cada letra es un anillo. Cuando alguien lo abre, las pistas de adentro quedan a la vista de todos y se pueden pasar al tablero o al archivo.</p>
     </section>
 
     <section class="card">
@@ -166,6 +193,7 @@
             <select id="fPlace">
               <option value="board">En el tablero</option>
               <option value="folder">Guardado en el archivo (carpeta)</option>
+              <option value="cryptex">Adentro del cryptex (escritorio)</option>
             </select>
           </div>
         </div>
@@ -180,11 +208,13 @@
             <input type="checkbox" id="fLock">
             <span>🔒 Bloquear con clave: los jugadores ven la pista cerrada hasta que escriben la clave</span>
           </label>
+          <p class="help hidden" id="cryptexHelp">🔐 Va adentro del cryptex del escritorio, así que la clave es obligatoria: <strong>solo letras; cada letra es un anillo</strong> (de 3 a 10 letras, sin números ni signos; no importan mayúsculas ni acentos). Los jugadores lo abren girando los anillos hasta formar la palabra.</p>
         </div>
         <div class="grid2 hidden" id="lockFields">
           <div class="field">
-            <label for="fLockKey">Clave</label>
+            <label for="fLockKey" id="fLockKeyLabel">Clave</label>
             <input type="text" id="fLockKey" placeholder="Ej: JARDINERO" autocomplete="off">
+            <p class="help" id="fKeyInfo" aria-live="polite"></p>
           </div>
           <div class="field">
             <label for="fLockHint">Texto que ve el jugador</label>

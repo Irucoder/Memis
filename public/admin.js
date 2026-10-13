@@ -44,6 +44,19 @@ function fromLocalInput(v) {
 }
 const fmt = (iso) => new Date(iso).toLocaleString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
+// Clave del cryptex: solo letras (sin acentos ni espacios); cada letra es un anillo.
+// Mismas reglas que el servidor: "Jardín" → JARDIN, Ñ → N, de 3 a 10 letras.
+const cryptexLetters = (k) => String(k || '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/\s+/g, '');
+function cryptexKeyError(k) {
+  const letters = cryptexLetters(k);
+  if (!letters) return 'Escribí la clave del cryptex: solo letras, de 3 a 10 (cada letra es un anillo)';
+  if (!/^[A-Z]+$/.test(letters)) return 'La clave del cryptex lleva solo letras, sin números ni signos (cada letra es un anillo)';
+  if (letters.length < 3) return 'La clave del cryptex tiene que tener al menos 3 letras';
+  if (letters.length > 10) return 'La clave del cryptex puede tener hasta 10 letras (10 anillos)';
+  return '';
+}
+const rings = (n) => (n === 1 ? '1 anillo' : n + ' anillos');
+
 async function load() {
   state = await api('GET', '/api/admin/state');
   clockOffset = state.serverNow - Date.now();
@@ -71,7 +84,54 @@ function renderSettings() {
   const m = state.noteCount || 0;
   $('noteStatus').textContent = m === 0 ? 'Todavía no hay post-its.' : m === 1 ? 'Hay 1 post-it en el tablero.' : `Hay ${m} post-its en el tablero.`;
   $('clearNotes').disabled = m === 0;
+  renderDesk();
 }
+
+// ---------- Escritorio ----------
+
+function renderDesk() {
+  const desk = state.desk || { placed: 0, moved: 0, total: 20 };
+  const visible = state.settings.puzzleVisible !== false;
+  $('puzzleVisible').checked = visible;
+  const done = desk.placed >= desk.total;
+  $('puzzleStatus').textContent = `${desk.placed} de ${desk.total} piezas en su lugar` +
+    (done ? ': ¡armado!' : '.') + (visible ? '' : ' Está oculto: no se ve en el escritorio.');
+  $('puzzleBar').style.width = (100 * desk.placed / desk.total) + '%';
+  $('resetPuzzle').disabled = !desk.moved;
+
+  // Qué hay adentro del cryptex ahora
+  const inside = state.docs.filter((d) => d.spot === 'cryptex');
+  const live = inside.filter((d) => !d.pending);
+  const waiting = inside.length - live.length;
+  const el = $('cryptexStatus');
+  if (!inside.length) {
+    el.textContent = '🔐 El cryptex está vacío: no hay pistas adentro.';
+    return;
+  }
+  const sealed = live.filter((d) => d.sealed);
+  const parts = [];
+  if (live.length) parts.push(live.length === 1 ? '1 pista' : `${live.length} pistas`);
+  if (waiting) parts.push(waiting === 1 ? '1 programada' : `${waiting} programadas`);
+  const how = !live.length ? 'todavía sin nada a la vista'
+    : sealed.length ? `🔒 cerrado (${rings(cryptexLetters(sealed[0].lockKey).length)})`
+    : '🔓 abierto: las pistas esperan que alguien las saque';
+  el.textContent = `🔐 Adentro del cryptex: ${parts.join(' y ')} · ${how}.`;
+}
+
+$('puzzleVisible').addEventListener('change', (e) => saveSettings(
+  { puzzleVisible: e.target.checked },
+  e.target.checked ? 'El rompecabezas está en el escritorio' : 'Rompecabezas guardado: no se ve en el escritorio'
+));
+$('resetPuzzle').addEventListener('click', async () => {
+  if (!confirm('¿Desarmar el rompecabezas del poema? Todas las piezas vuelven a desparramarse por el escritorio, para todos los jugadores. No se puede deshacer.')) return;
+  try {
+    await api('DELETE', '/api/admin/desk/puzzle');
+    toast('Rompecabezas desarmado');
+    await load();
+  } catch (e) {
+    toast(e.message);
+  }
+});
 
 async function saveSettings(patch, msg) {
   try {
@@ -126,6 +186,35 @@ document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('cli
 }));
 
 $('fLock').addEventListener('change', () => $('lockFields').classList.toggle('hidden', !$('fLock').checked));
+
+// Adentro del cryptex: la clave es obligatoria (el candado queda tildado) y son solo letras
+let lockBefore = false; // cómo estaba el candado antes de elegir el cryptex
+function syncPlace() {
+  const cryptex = $('fPlace').value === 'cryptex';
+  const lock = $('fLock');
+  if (cryptex && !lock.disabled) { lockBefore = lock.checked; lock.checked = true; }
+  if (!cryptex && lock.disabled) lock.checked = lockBefore;
+  lock.disabled = cryptex;
+  $('cryptexHelp').classList.toggle('hidden', !cryptex);
+  $('lockFields').classList.toggle('hidden', !lock.checked);
+  $('fLockKeyLabel').textContent = cryptex ? 'Clave del cryptex (solo letras)' : 'Clave';
+  $('fLockKey').placeholder = cryptex ? 'Ej: MEMIS' : 'Ej: JARDINERO';
+  $('uploadBtn').textContent = cryptex ? 'Guardar en el cryptex' : 'Cargar al tablero';
+  showKeyInfo();
+}
+// Mientras se escribe: cuántos anillos va a tener, o qué está mal
+function showKeyInfo() {
+  const info = $('fKeyInfo');
+  const key = $('fLockKey').value;
+  info.className = 'help';
+  info.textContent = '';
+  if ($('fPlace').value !== 'cryptex' || !key.trim()) return;
+  const err = cryptexKeyError(key);
+  info.classList.add(err ? 'bad' : 'good');
+  info.textContent = err || `${cryptexLetters(key)} · ${rings(cryptexLetters(key).length)}`;
+}
+$('fPlace').addEventListener('change', syncPlace);
+$('fLockKey').addEventListener('input', showKeyInfo);
 
 document.querySelectorAll('input[name=when]').forEach((r) => r.addEventListener('change', () => {
   const later = document.querySelector('input[name=when]:checked').value === 'later';
@@ -196,7 +285,13 @@ $('uploadForm').addEventListener('submit', async (e) => {
   if ($('fStyle').value !== 'auto') common.style = $('fStyle').value;
   if ($('fNew').checked) common.isNew = true;
   if ($('fLock').checked) {
-    if (!$('fLockKey').value.trim()) return toast('Escribí la clave para desbloquear la pista');
+    if (common.place === 'cryptex') {
+      const err = cryptexKeyError($('fLockKey').value);
+      if (err) {
+        $('fLockKey').focus();
+        return toast(err);
+      }
+    } else if (!$('fLockKey').value.trim()) return toast('Escribí la clave para desbloquear la pista');
     common.lockKey = $('fLockKey').value.trim();
     common.lockHint = $('fLockHint').value.trim();
   }
@@ -229,7 +324,8 @@ $('uploadForm').addEventListener('submit', async (e) => {
     }
     toast(jobs.length > 1 ? `${jobs.length} documentos cargados` : 'Documento cargado');
     $('uploadForm').reset();
-    $('lockFields').classList.add('hidden');
+    $('fLock').disabled = false;
+    syncPlace();
     $('fPublishAt').disabled = true;
     await load();
   } catch (err) {
@@ -297,7 +393,7 @@ function docItem(d) {
       </div>
       <div class="field" style="margin-top:8px"><label>Epígrafe</label><input type="text" data-f="caption"></div>
       <div class="controls" style="margin-top:8px">
-        <div class="field"><label>🔒 Clave (vacío = sin clave)</label><input type="text" data-f="lockKey" autocomplete="off"></div>
+        <div class="field"><label class="key-label">🔒 Clave (vacío = sin clave)</label><input type="text" data-f="lockKey" autocomplete="off"></div>
         <div class="field" style="grid-column: span 2"><label>Texto que ve el jugador</label><input type="text" data-f="lockHint"></div>
       </div>
       <div class="btns"></div>
@@ -318,8 +414,10 @@ function docItem(d) {
   q('rot').value = d.rot;
   [['default', 'Según configuración general'], ['show', 'Mostrar silueta con ?'], ['hide', 'No mostrar nada']]
     .forEach(([v, l]) => q('preview').appendChild(option(v, l, d.preview)));
-  [['board', 'El tablero'], ['folder', 'El archivo (carpeta)']]
+  [['board', 'El tablero'], ['folder', 'El archivo (carpeta)'], ['cryptex', 'El cryptex']]
     .forEach(([v, l]) => q('place').appendChild(option(v, l, d.place || 'board')));
+  const inCryptex = d.place === 'cryptex';
+  if (inCryptex) item.querySelector('.key-label').textContent = '🔐 Clave del cryptex (solo letras)';
   [['papel', 'Hoja de papel'], ['polaroid', 'Polaroid'], ['foto', 'Foto con chinche'], ['recorte', 'Recorte de diario'], ['nota', 'Nota adhesiva']]
     .forEach(([v, l]) => q('style').appendChild(option(v, l, d.style)));
 
@@ -329,13 +427,21 @@ function docItem(d) {
     pill.textContent = 'Programado · ' + fmt(d.publishAt);
   } else {
     pill.className = 'pill live';
-    pill.textContent = d.folder ? 'Publicado · en el archivo' : 'Publicado · en el tablero';
+    const where = { board: 'en el tablero', folder: 'en el archivo', cryptex: 'adentro del cryptex' };
+    pill.textContent = 'Publicado · ' + where[d.spot || (d.folder ? 'folder' : 'board')];
   }
   if (d.hasLock) {
     const lockPill = document.createElement('span');
     lockPill.className = 'pill ' + (d.sealed ? 'sched' : 'live');
-    lockPill.textContent = d.sealed ? '🔒 Bloqueada' : '🔓 Desbloqueada';
+    lockPill.textContent = inCryptex ? (d.sealed ? '🔒 Cryptex cerrado' : '🔓 Cryptex abierto') : d.sealed ? '🔒 Bloqueada' : '🔓 Desbloqueada';
     pill.after(lockPill);
+  }
+  if (inCryptex) { // insignia: esta pista va (o fue) adentro del cryptex
+    const cx = document.createElement('span');
+    cx.className = 'pill cryptex';
+    cx.textContent = '🔐 Cryptex · ' + rings(cryptexLetters(d.lockKey).length);
+    cx.title = d.spot === 'cryptex' ? 'Está adentro del cryptex del escritorio' : 'Salió del cryptex: ya la pasaron al ' + (d.spot === 'folder' ? 'archivo' : 'tablero');
+    pill.after(cx);
   }
 
   item.querySelectorAll('[data-f]').forEach((input) => input.addEventListener('change', () => {
@@ -343,6 +449,20 @@ function docItem(d) {
     let value = input.type === 'checkbox' ? input.checked : input.value;
     if (f === 'publishAt') value = fromLocalInput(value);
     if (f === 'w' || f === 'rot') value = Number(value);
+    // Al cryptex sin una clave que sirva: se pide ahí mismo (o se deja como estaba)
+    if (f === 'place' && value === 'cryptex' && cryptexKeyError(d.lockKey)) {
+      const key = askCryptexKey(d);
+      if (key === null) {
+        input.value = d.place || 'board';
+        return;
+      }
+      return patch(d.id, { place: 'cryptex', lockKey: key });
+    }
+    if (f === 'lockKey' && inCryptex && cryptexKeyError(value)) {
+      toast(cryptexKeyError(value));
+      input.value = d.lockKey || '';
+      return;
+    }
     patch(d.id, { [f]: value });
   }));
 
@@ -360,7 +480,8 @@ function docItem(d) {
     btns.appendChild(edit);
   }
   if (d.hasLock && !d.sealed) {
-    const relock = Object.assign(document.createElement('button'), { className: 'btn small dark', type: 'button', textContent: '🔒 Volver a bloquear' });
+    const relock = Object.assign(document.createElement('button'), { className: 'btn small dark', type: 'button', textContent: inCryptex ? '🔒 Volver a cerrar el cryptex' : '🔒 Volver a bloquear' });
+    if (inCryptex) relock.title = 'La pista vuelve adentro del cryptex, cerrada, aunque ya la hayan sacado';
     relock.addEventListener('click', () => patch(d.id, { relock: true }));
     btns.appendChild(relock);
   }
@@ -387,6 +508,18 @@ function docItem(d) {
   return item;
 }
 
+// Pide la clave para pasar una pista al cryptex; null si se cancela
+function askCryptexKey(d) {
+  let key = d.lockKey || '';
+  let err = '';
+  for (;;) {
+    key = prompt(`Para guardar "${d.title || 'esta pista'}" adentro del cryptex hace falta una clave: solo letras, de 3 a 10. Cada letra es un anillo.` + (err ? '\n\n⚠ ' + err : ''), key);
+    if (key === null) return null;
+    err = cryptexKeyError(key);
+    if (!err) return key.trim();
+  }
+}
+
 async function patch(id, fields) {
   try {
     await api('PATCH', '/api/admin/docs/' + id, fields);
@@ -394,6 +527,7 @@ async function patch(id, fields) {
     await load();
   } catch (e) {
     toast(e.message);
+    load().catch(() => {}); // vuelve a mostrar lo que quedó guardado
   }
 }
 

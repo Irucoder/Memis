@@ -11,12 +11,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Courier+Prime:wght@400;700&family=Special+Elite&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/escena.css">
+  <link rel="stylesheet" href="/cryptex.css">
+  <link rel="stylesheet" href="/rompecabezas.css">
 </head>
 <body>
   <main class="room">
+    <!-- Cámara: la pared con la lámpara y el tablero. En la vista general se aleja y abajo aparece el escritorio. -->
+    <div class="camara" id="camara">
     <div class="lamp" aria-hidden="true"><div class="cord"></div><div class="shade"></div><div class="rim"></div><div class="bulb"></div></div>
 
     <header class="topbar">
+      <button class="btn small dark volver hidden" id="backBtn" type="button">↩ Volver</button>
       <div class="actions">
         <button class="btn small dark hidden" id="editBtn" type="button">Acomodar</button>
         <a class="btn small dark hidden" id="adminLink" href="/admin">Panel admin</a>
@@ -55,6 +61,25 @@
         <svg class="threads" id="threads" aria-hidden="true"></svg>
       </div>
     </section>
+    </div>
+
+    <!-- Escritorio: en la vista general se ve en perspectiva abajo del tablero; al acercarse queda de frente -->
+    <section class="escritorio hidden" id="deskView" aria-label="Escritorio">
+      <div class="esc-plano" id="deskPlane">
+        <div class="esc-area" id="deskArea">
+          <div class="esc-rompecabezas" id="puzzleHost"></div>
+          <button class="esc-cryptex" id="cryptexObj" type="button" aria-label="Cryptex">
+            <img src="/escritorio/cryptex.webp" alt="" draggable="false">
+            <span class="esc-pergamino" aria-hidden="true"></span>
+            <span class="esc-etiqueta hidden" id="cryptexTag"></span>
+          </button>
+        </div>
+        <button class="esc-acercar" id="goDesk" type="button" aria-label="Acercarse al escritorio"></button>
+        <div class="esc-frente" aria-hidden="true"></div>
+      </div>
+    </section>
+    <button class="ir-tablero hidden" id="goBoard" type="button" aria-label="Acercarse al tablero"></button>
+    <p class="esc-ayuda hidden" id="sceneHint">Tocá el tablero o el escritorio para acercarte</p>
 
     <button class="spool hidden" id="spool" type="button" aria-pressed="false" title="Conectar pistas con hilo">
       <span class="spool-body" aria-hidden="true">
@@ -103,11 +128,22 @@
     <div class="lb-content" id="lbContent"></div>
   </div>
 
+  <div class="cx-modal" id="cxModal" role="dialog" aria-modal="true" aria-label="Cryptex">
+    <div class="cx-hoja">
+      <button class="cx-cerrar" id="cxClose" type="button" aria-label="Cerrar">×</button>
+      <div class="cx-host" id="cxHost"></div>
+      <p class="cx-ayuda" id="cxHint"></p>
+    </div>
+  </div>
+
   <div class="edit-hint hidden" id="editHint">Rueda del mouse sobre una pista para rotarla · Shift + rueda (o Shift + / −) para cambiar el tamaño</div>
   <div class="edit-hint hidden" id="threadHint"></div>
   <div class="thread-menu hidden" id="threadMenu"><button class="btn small" id="cutThread" type="button">✂ Cortar hilo</button></div>
 
   <script src="/auth.js"></script>
+  <script src="/cryptex.js"></script>
+  <script src="/rompecabezas.js"></script>
   <script src="/board.js"></script>
+  <script src="/escritorio.js"></script>
 </body>
 </html>

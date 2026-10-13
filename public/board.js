@@ -102,11 +102,14 @@ async function load() {
     showWait();
   } else {
     threads = s.threads || [];
-    showBoard(s.docs.filter((d) => !d.folder));
-    showArchive(s.docs.filter((d) => d.folder));
+    // dónde está cada pista: en el corcho, guardada en el archivo o adentro del cryptex (escritorio)
+    showBoard(s.docs.filter((d) => spotOf(d) === 'board'));
+    showArchive(s.docs.filter((d) => spotOf(d) === 'folder'));
     showNotes(s.notes || []);
   }
+  if (window.memisDesk) window.memisDesk.update(s);
 }
+const spotOf = (d) => d.spot || (d.folder ? 'folder' : 'board');
 
 setInterval(load, POLL_MS);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
@@ -462,11 +465,12 @@ function openLightbox(d) {
   dl.textContent = 'Abrir original';
   // Guardar en el archivo / pasar al tablero, desde el documento abierto
   const mv = $('lbMove');
-  mv.classList.toggle('hidden', !!d.pending && !d.kind);
-  mv.textContent = d.folder ? '📌 Pasar al tablero' : '🗂 Guardar en el archivo';
+  const toBoard = d.folder || spotOf(d) === 'cryptex'; // lo que sale del cryptex va al tablero
+  mv.classList.toggle('hidden', !!d.noMove || (!!d.pending && !d.kind));
+  mv.textContent = toBoard ? '📌 Pasar al tablero' : '🗂 Guardar en el archivo';
   mv.onclick = async () => {
     closeLightbox();
-    await moveDoc(d.id, !d.folder);
+    await moveDoc(d.id, !toBoard);
   };
 
   if (d.kind === 'text') {
@@ -590,6 +594,9 @@ function closeLightbox() {
   lightbox.classList.remove('open');
   $('lbContent').replaceChildren();
 }
+
+// Lo que usa el escritorio (escritorio.js)
+window.memisBoard = { openLightbox, closeLightbox, toast, load, moveDoc, whenText, isOpen: () => lightbox.classList.contains('open') };
 
 $('lbClose').addEventListener('click', closeLightbox);
 lightbox.addEventListener('click', (e) => {

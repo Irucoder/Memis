@@ -18,6 +18,7 @@ const SECRET_FILE = path.join(DATA_DIR, 'secret');
 const THREADS_FILE = path.join(DATA_DIR, 'threads.json');
 const LAYOUTS_FILE = path.join(DATA_DIR, 'layouts.json');
 const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
+const DESK_FILE = path.join(DATA_DIR, 'desk.json'); // escritorio: piezas del rompecabezas
 const PUBLIC_DIR = path.join(ROOT, 'public');
 
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -41,9 +42,12 @@ const readJSON = async (file) => {
   return raw ? JSON.parse(raw) : {};
 };
 const queues = new Map();
+// Se escribe en un archivo aparte y se renombra: quien lee mientras tanto
+// (el tablero pregunta seguido) nunca encuentra el archivo a medio escribir.
 function updateJSON(file, fn) {
   const run = (queues.get(file) || Promise.resolve()).then(async () => {
-    await fsp.writeFile(file, JSON.stringify(fn(await readJSON(file)), null, 2));
+    await fsp.writeFile(file + '.tmp', JSON.stringify(fn(await readJSON(file)), null, 2));
+    await fsp.rename(file + '.tmp', file);
   });
   queues.set(file, run.catch(() => {}));
   return run;
@@ -80,6 +84,8 @@ const handle = createHandler(
     updateLayouts: (fn) => updateJSON(LAYOUTS_FILE, fn),
     readNotes: () => readJSON(NOTES_FILE),
     updateNotes: (fn) => updateJSON(NOTES_FILE, fn),
+    readDesk: () => readJSON(DESK_FILE),
+    updateDesk: (fn) => updateJSON(DESK_FILE, fn),
   },
   {
     passwords: {

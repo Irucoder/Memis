@@ -1,0 +1,270 @@
+/* ---------- Escena: la pared con el tablero y el escritorio ----------
+   Tres vistas: general (se ve el tablero colgado y abajo el escritorio),
+   tablero (igual que siempre) y escritorio (de frente, para jugar).
+   Las medidas que dependen de la pantalla las pone escritorio.js. */
+
+.camara {
+  position: relative;
+  z-index: 10; /* como el tablero: queda arriba del oscurecimiento de la lámpara */
+  transform-origin: 0 0;
+}
+.camara.moviendo {
+  transition: transform 0.85s cubic-bezier(0.55, 0.05, 0.25, 1);
+}
+/* En la vista general y en el escritorio el corcho no se recorre: se ve entero */
+.vista-escena .board-scroll,
+.vista-escritorio .board-scroll { overflow: visible; }
+.vista-escena .board-scroll *,
+.vista-escritorio .board-scroll * { pointer-events: none; }
+
+/* Las herramientas del tablero (hilo, post-it, archivo) solo en el tablero */
+.vista-escena .spool, .vista-escena .notepad, .vista-escena .folder-btn,
+.vista-escritorio .spool, .vista-escritorio .notepad, .vista-escritorio .folder-btn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.spool, .notepad, .folder-btn { transition: opacity 0.4s, visibility 0.4s; }
+.vista-tablero .spool, .vista-tablero .notepad, .vista-tablero .folder-btn { transition-delay: 0.55s; } /* aparecen al terminar el zoom */
+
+/* ---------- Escritorio ---------- */
+
+.escritorio {
+  position: fixed;
+  inset: 0;
+  z-index: 20; /* sobre la pared; debajo de la barra de arriba y las herramientas */
+  overflow: hidden;
+  perspective: 1500px;
+  pointer-events: none;
+}
+.escritorio.hidden { display: none; }
+.vista-escritorio .escritorio.listo { overflow-x: auto; overflow-y: hidden; pointer-events: auto; }
+.vista-tablero .escritorio { visibility: hidden; }
+.vista-tablero .escritorio.moviendo { visibility: visible; }
+
+.esc-plano {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 50% 0;
+  background: url('/escritorio/madera.webp') center / cover no-repeat, #2a1a10;
+  box-shadow: 0 -2px 0 rgba(0, 0, 0, 0.55), 0 -18px 40px rgba(0, 0, 0, 0.55); /* donde toca la pared */
+  pointer-events: auto;
+}
+.escritorio.moviendo .esc-plano {
+  transition: transform 0.85s cubic-bezier(0.55, 0.05, 0.25, 1), opacity 0.6s;
+}
+.esc-plano { transform-style: preserve-3d; }
+/* el canto de adelante del escritorio (de frente queda de perfil y no se ve) */
+.esc-frente {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 7vh;
+  transform-origin: 50% 0;
+  transform: rotateX(-90deg);
+  background:
+    linear-gradient(180deg, rgba(255, 230, 190, 0.12), transparent 18%, rgba(0, 0, 0, 0.35) 70%, rgba(0, 0, 0, 0.7)),
+    url('/escritorio/madera.webp') center 30% / cover no-repeat, #24160d;
+  box-shadow: 0 30px 50px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+.esc-plano::before { /* la luz de la lámpara sobre la madera */
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 70% at 50% 0%, rgba(255, 236, 200, 0.16), transparent 70%),
+    radial-gradient(ellipse 120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.45) 100%);
+  z-index: 0;
+}
+
+.esc-area {
+  position: absolute;
+  z-index: 1;
+}
+
+.esc-rompecabezas {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+}
+
+/* El cryptex apoyado en la madera */
+.esc-cryptex {
+  position: absolute;
+  left: 73.4%;
+  top: 70.5%;
+  width: 24%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  z-index: 1;
+  transform: rotate(-7deg);
+  transition: transform 0.25s, filter 0.25s;
+  filter: drop-shadow(0 10px 10px rgba(0, 0, 0, 0.55)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6));
+  -webkit-tap-highlight-color: transparent;
+}
+.esc-cryptex img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
+.esc-cryptex.sin-foto { visibility: hidden; }
+.vista-escritorio .esc-cryptex:hover,
+.vista-escritorio .esc-cryptex:focus-visible {
+  transform: rotate(-7deg) translateY(-4px) scale(1.02);
+  filter: drop-shadow(0 16px 14px rgba(0, 0, 0, 0.55)) drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6)) brightness(1.08);
+}
+.esc-cryptex:focus-visible { outline: 2px solid rgba(255, 236, 190, 0.7); outline-offset: 6px; border-radius: 12px; }
+/* abierto: asoma el pergamino que tenía adentro */
+.esc-pergamino {
+  display: none;
+  position: absolute;
+  left: 18%;
+  top: -24%;
+  width: 52%;
+  height: 26%;
+  border-radius: 40% / 50%;
+  background:
+    linear-gradient(90deg, rgba(90, 60, 30, 0.45), transparent 12%, transparent 88%, rgba(90, 60, 30, 0.45)),
+    linear-gradient(180deg, #efe1bd, #d9c393 60%, #b99a62);
+  box-shadow: inset 0 -3px 6px rgba(80, 50, 20, 0.35), 0 6px 8px rgba(0, 0, 0, 0.45);
+  transform: rotate(4deg);
+}
+.esc-cryptex.abierto .esc-pergamino { display: block; }
+.esc-etiqueta {
+  position: absolute;
+  left: 50%;
+  bottom: -20%;
+  transform: translateX(-50%) rotate(5deg);
+  padding: 0.35em 0.7em;
+  white-space: nowrap;
+  font: 600 clamp(10px, 1.1vw, 14px) / 1.2 var(--font-mono);
+  color: #2b2116;
+  background: #e8dcc0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* En la vista general todo el escritorio es un solo botón: acercarse */
+.esc-acercar {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+  -webkit-tap-highlight-color: transparent;
+}
+.vista-escritorio .esc-acercar { display: none; }
+.vista-escena .esc-plano:hover::after,
+.esc-acercar:focus-visible { outline: none; }
+.vista-escena .esc-plano::after { /* brillo suave al pasar el mouse */
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: radial-gradient(ellipse 60% 60% at 50% 40%, rgba(255, 236, 200, 0.08), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.vista-escena .esc-plano:hover::after { opacity: 1; }
+
+/* El tablero en la vista general: un botón invisible encima (lo ubica escritorio.js) */
+.ir-tablero {
+  position: fixed;
+  z-index: 25;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  cursor: zoom-in;
+  transition: box-shadow 0.3s, background-color 0.3s;
+  -webkit-tap-highlight-color: transparent;
+}
+.ir-tablero:hover, .ir-tablero:focus-visible {
+  outline: none;
+  background: rgba(255, 244, 220, 0.05);
+  box-shadow: 0 0 0 2px rgba(255, 236, 200, 0.28), 0 0 40px rgba(255, 236, 200, 0.12);
+}
+
+.esc-ayuda {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  z-index: 30;
+  margin: 0;
+  padding: 6px 14px;
+  transform: translateX(-50%);
+  font-family: var(--font-type);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  color: rgba(240, 230, 210, 0.85);
+  background: rgba(10, 8, 6, 0.55);
+  border-radius: 999px;
+  pointer-events: none;
+  max-width: calc(100vw - 24px);
+  text-align: center;
+  transition: opacity 0.5s;
+}
+@media (max-width: 600px) { .esc-ayuda { font-size: 11px; letter-spacing: 0.04em; } }
+
+/* Volver a la vista general */
+.topbar .volver { margin-right: auto; }
+
+/* ---------- Cryptex de cerca ---------- */
+
+.cx-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: radial-gradient(ellipse at 50% 45%, rgba(30, 20, 10, 0.72), rgba(0, 0, 0, 0.9));
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s, visibility 0.3s;
+}
+.cx-modal.open { opacity: 1; visibility: visible; }
+.cx-hoja {
+  position: relative;
+  width: min(820px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+.cx-host { width: 100%; display: grid; justify-items: center; }
+.cx-cerrar {
+  position: absolute;
+  top: -8px;
+  right: -4px;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+  color: #f1e6cc;
+  background: rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+}
+.cx-ayuda {
+  margin: 0;
+  max-width: 560px;
+  text-align: center;
+  font-family: var(--font-type);
+  font-size: 15px;
+  line-height: 1.45;
+  color: rgba(240, 228, 200, 0.9);
+}
+.cx-ayuda:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .camara.moviendo, .escritorio.moviendo .esc-plano { transition-duration: 0.01s; }
+}
