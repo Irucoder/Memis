@@ -12,10 +12,14 @@
   transition: transform 0.85s cubic-bezier(0.55, 0.05, 0.25, 1);
 }
 /* durante el zoom no se toca nada (un doble clic no abre lo que queda debajo) */
-.camara.moviendo, .escritorio.moviendo .esc-plano { pointer-events: none; }
-/* En la vista general y en el escritorio el corcho no se recorre: se ve entero */
+.camara.moviendo, .escritorio.moviendo .esc-plano,
+.camara.moviendo .thread-hits path, .camara.moviendo .threads .t-hit { pointer-events: none; }
+/* En la vista general, en el escritorio y durante el zoom el corcho no se recorre: se ve entero
+   (el corrimiento para quedar bajo la lámpara va como translate; lo pone escritorio.js) */
 .vista-escena .board-scroll,
-.vista-escritorio .board-scroll { overflow: visible; }
+.vista-escritorio .board-scroll,
+.camara.moviendo .board-scroll { overflow: visible; }
+.vista-escena .room, .vista-escritorio .room { height: 100vh; height: 100dvh; }
 .vista-escena .board-scroll *,
 .vista-escritorio .board-scroll * { pointer-events: none; }
 
@@ -69,7 +73,6 @@
   background:
     linear-gradient(180deg, rgba(255, 230, 190, 0.12), transparent 18%, rgba(0, 0, 0, 0.35) 70%, rgba(0, 0, 0, 0.7)),
     url('/escritorio/madera.webp') center 30% / cover no-repeat, #24160d;
-  box-shadow: 0 30px 50px rgba(0, 0, 0, 0.8);
   pointer-events: none;
 }
 .esc-plano::before { /* la luz de la lámpara sobre la madera */
@@ -120,16 +123,18 @@
 }
 .esc-cryptex:focus-visible { outline: 2px solid rgba(255, 236, 190, 0.7); outline-offset: 6px; border-radius: 12px; }
 /* lo que salió del cryptex: pergaminos enrollados al lado */
-.esc-pergaminos { /* entre las piezas de la derecha y el cryptex */
+.esc-pergaminos { /* entre las piezas de la derecha y el cryptex; si hay muchos, se apilan hacia arriba */
   position: absolute;
   left: 74%;
-  top: 63%;
+  bottom: 31.5%;
   z-index: 1;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap-reverse;
   gap: 1%;
   width: 24%;
+  pointer-events: none; /* la caja no tapa al cryptex: solo los pergaminos se tocan */
 }
+.escritorio:not(.moviendo) .esc-pergamino { pointer-events: auto; }
 .esc-pergamino {
   position: relative;
   width: 46%;
@@ -185,8 +190,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 .vista-escritorio .esc-acercar { display: none; }
-.vista-escena .esc-plano:hover::after,
-.esc-acercar:focus-visible { outline: none; }
+.vista-escena .esc-area { pointer-events: none; }
+.esc-acercar:focus-visible { outline: 3px solid rgba(255, 236, 200, 0.6); outline-offset: -10px; }
 .vista-escena .esc-plano::after { /* brillo suave al pasar el mouse */
   content: '';
   position: absolute;
@@ -197,7 +202,8 @@
   opacity: 0;
   transition: opacity 0.3s;
 }
-.vista-escena .esc-plano:hover::after { opacity: 1; }
+.vista-escena .esc-plano:hover::after,
+.vista-escena .esc-plano:has(.esc-acercar:focus-visible)::after { opacity: 1; }
 
 /* El tablero en la vista general: un botón invisible encima (lo ubica escritorio.js) */
 .ir-tablero {
@@ -241,6 +247,11 @@
 
 /* Volver a la vista general */
 .topbar .volver { margin-right: auto; }
+.topbar .btn { white-space: nowrap; }
+@media (max-width: 420px) {
+  .topbar .volver { font-size: 0; gap: 0; }
+  .topbar .volver::before { content: '↩'; font-size: 14px; }
+}
 
 /* ---------- Cryptex de cerca ---------- */
 

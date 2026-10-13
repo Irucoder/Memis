@@ -68,7 +68,7 @@
 }
 .rz-agarra .rz-pieza { cursor: grab; }
 .rz-moviendo, .rz-moviendo .rz-pieza { cursor: grabbing; }
-.rz-quieto .rz-pieza { pointer-events: none; }
+.rz-quieto .rz-pieza, .rz-pieza.rz-ok { pointer-events: none; } /* quieta o ya en su lugar: no se agarra */
 
 /* levantada: un poco más grande y con la sombra más lejos */
 .rz-pieza.rz-arrastrando {

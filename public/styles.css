@@ -1097,10 +1097,11 @@ button, input, select, textarea { font: inherit; color: inherit; }
   justify-content: flex-end;
   background: rgba(3, 7, 11, 0.55);
   opacity: 0;
+  visibility: hidden; /* cerrado no se alcanza con Tab */
   pointer-events: none;
-  transition: opacity 0.25s;
+  transition: opacity 0.25s, visibility 0s 0.25s;
 }
-.archive.open { opacity: 1; pointer-events: auto; }
+.archive.open { opacity: 1; visibility: visible; pointer-events: auto; transition: opacity 0.25s; }
 .archive-sheet {
   position: relative;
   width: min(600px, 94vw);

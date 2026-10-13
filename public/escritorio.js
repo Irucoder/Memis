@@ -41,7 +41,9 @@
     const sc = $('boardView');
     // offset* no cambian con los transform: son las medidas del tablero "de cerca"
     const bw = board.offsetWidth, bh = board.offsetHeight;
-    const bl = sc.offsetLeft + board.offsetLeft;
+    // en pantallas angostas el corcho se recorre de costado para quedar bajo la lámpara:
+    // en la vista general ese corrimiento va como translate (ver boardOff)
+    const bl = sc.offsetLeft + board.offsetLeft - boardOff();
     const bt = sc.offsetTop + board.offsetTop;
     const bottom = bt + bh;
     const k = Math.min(0.62, (vh * 0.5) / bottom, (vw * 0.94) / bw);
@@ -81,9 +83,10 @@
     };
   }
 
+  let deskOff = 0; // de frente y más ancho que la pantalla: cuánto está corrido (va al scroll al quedar quieto)
   function deskTransform(v) {
     const g = geo;
-    if (v === 'escritorio') return 'translate3d(0px, 0px, 0px) rotateX(0deg) scale(1, 1)';
+    if (v === 'escritorio') return `translate3d(${-deskOff}px, 0px, 0px) rotateX(0deg) scale(1, 1)`;
     const y = v === 'tablero' ? g.vh + 60 : g.yd;
     return `translate3d(${(g.vw - g.pw) / 2}px, ${y}px, 0px) rotateX(${g.tilt}deg) scale(${g.sx}, ${g.sy})`;
   }
@@ -106,19 +109,32 @@
   };
 
   let boardScroll = null; // en pantallas angostas: hasta dónde se había recorrido el corcho
+  // cuánto se corre el corcho para quedar bajo la lámpara (0 si entra entero)
+  function boardOff() {
+    const b = $('board'), sc = $('boardView');
+    return Math.max(0, boardScroll ?? b.offsetLeft + b.offsetWidth / 2 - sc.clientWidth / 2);
+  }
+  let refocusFrom = null; // si se cambió de vista con el teclado, a dónde volver el foco
   function setView(next, { push = true, instant = false } = {}) {
     if (locked || next === view) return;
     const first = view === null;
+    const prev = view;
+    const ae = document.activeElement;
+    refocusFrom = !first && ae && ['goDesk', 'goBoard', 'backBtn'].includes(ae.id) ? prev : null;
     const sc = $('boardView');
     if (view === 'tablero') {
       boardScroll = sc.scrollLeft;
       B.leaveBoard(); // hilo, acomodar, archivo: quedan apagados
+      // el corrimiento pasa del scroll a un translate, sin que se note
+      camara.classList.remove('moviendo');
+      $('board').style.translate = `${-boardScroll}px 0px`;
+      window.scrollTo(0, 0); // afuera del tablero la página no se desplaza
     }
     view = next;
     if (push) history.pushState({ vista: next }, '', next === 'escena' ? location.pathname + location.search : '#' + next);
     body.classList.remove('vista-escena', 'vista-tablero', 'vista-escritorio');
     body.classList.add('vista-' + next);
-    if (next === 'tablero') sc.scrollLeft = boardScroll ?? (sc.scrollWidth - sc.clientWidth) / 2;
+    if (prev === 'tablero') void $('board').offsetWidth;
     apply(instant || first);
   }
 
@@ -126,10 +142,26 @@
     place();
     const anim = !instant && !reduced.matches;
     clearTimeout(settleTimer);
+    // si el escritorio estaba recorrido de costado, ese corrimiento pasa al transform (sin que se note)
+    if (desk.scrollLeft) {
+      deskOff = desk.scrollLeft;
+      desk.classList.remove('moviendo');
+      plano.style.transform = deskTransform('escritorio');
+      desk.scrollLeft = 0;
+      void plano.offsetWidth;
+    }
+    deskOff = view === 'escritorio' ? Math.max(0, (geo.pw - geo.vw) / 2) : 0;
     camara.classList.toggle('moviendo', anim);
     desk.classList.toggle('moviendo', anim);
     desk.classList.remove('listo');
     const g = geo;
+    // el corcho: de cerca, con scroll (sin translate) recién al quedar quieto
+    if (view === 'tablero' && !anim) {
+      $('board').style.translate = '';
+      $('boardView').scrollLeft = boardOff();
+    } else {
+      $('board').style.translate = `${-boardOff()}px 0px`;
+    }
     camara.style.transform = view === 'tablero'
       ? (anim ? 'translate(0px, 0px) scale(1)' : '')
       : `translate(${g.tx}px, ${g.ty}px) scale(${g.k})`;
@@ -139,7 +171,11 @@
     $('sceneHint').classList.toggle('hidden', view !== 'escena');
     $('backBtn').classList.toggle('hidden', view === 'escena');
     $('goDesk').tabIndex = view === 'escena' ? 0 : -1;
+    // lo que no se ve tampoco se alcanza con el teclado ni con un lector de pantalla
+    $('boardView').inert = view !== 'tablero';
+    area.inert = view !== 'escritorio';
     if (puzzle) puzzle.setInteractive(false); // se agarran recién con el escritorio quieto (settle)
+    else if (lastDesk && view !== 'tablero') { mountReady = true; syncPuzzle(lastDesk); }
     if (view !== 'escritorio') closeCryptex();
     settleTimer = setTimeout(settle, anim ? MOVE_MS : 0);
   }
@@ -147,12 +183,26 @@
   function settle() {
     camara.classList.remove('moviendo');
     desk.classList.remove('moviendo');
-    // de cerca, el tablero queda exactamente como siempre (sin transform)
-    if (view === 'tablero') camara.style.transform = '';
+    // de cerca, el tablero queda exactamente como siempre (sin transform ni translate)
+    if (view === 'tablero') {
+      camara.style.transform = '';
+      if ($('board').style.translate) {
+        $('board').style.translate = '';
+        $('boardView').scrollLeft = boardOff();
+      }
+    }
     if (view === 'escritorio') {
       desk.classList.add('listo');
       if (puzzle) puzzle.setInteractive(true);
-      desk.scrollLeft = (desk.scrollWidth - desk.clientWidth) / 2;
+      const off = deskOff;
+      deskOff = 0;
+      plano.style.transform = deskTransform('escritorio');
+      desk.scrollLeft = off;
+    }
+    if (refocusFrom !== null) {
+      const to = view === 'escena' ? $(refocusFrom === 'tablero' ? 'goBoard' : 'goDesk') : $('backBtn');
+      refocusFrom = null;
+      if (to) to.focus({ preventScroll: true });
     }
   }
 
@@ -199,7 +249,11 @@
     if (!res || !res.ok) B.toast('No se pudo guardar la pieza');
   }
 
+  let mountLater = null;
+  let mountReady = false;
+  let lastDesk = null;
   function syncPuzzle(d) {
+    lastDesk = d;
     const visible = d.puzzleVisible !== false;
     $('puzzleHost').classList.toggle('hidden', !visible);
     if (!visible || !window.Rompecabezas) return;
@@ -209,6 +263,11 @@
     if (puzzle) {
       puzzle.update(st);
       if (!puzzle.isDone()) doneShown = false; // si lo desarmaron, al volver a armarlo se avisa de nuevo
+      return;
+    }
+    // con el tablero de cerca el escritorio no se ve: se arma un rato después, sin trabar la carga
+    if (view === 'tablero' && !mountReady) {
+      if (!mountLater) mountLater = setTimeout(() => { mountReady = true; mountLater = null; if (!puzzle && lastDesk) syncPuzzle(lastDesk); }, 2500);
       return;
     }
     puzzle = window.Rompecabezas.mount($('puzzleHost'), {
@@ -270,7 +329,8 @@
         return b;
       }));
     }
-    if (cx && activeId && isOpen(byId(activeId))) {
+    if (cx && activeId && !byId(activeId)) openCryptex(); // lo abrieron y lo vaciaron mientras lo miraba
+    else if (cx && activeId && isOpen(byId(activeId))) {
       cx.setOpen(true); // lo abrió otro jugador mientras este lo miraba
       $('cxHint').textContent = 'Está abierto: tocá el pergamino para leerlo.';
     }
@@ -305,7 +365,7 @@
       ? 'Ya se abrió y está vacío: lo que guardaba quedó en el tablero o en el archivo.'
       : open
         ? 'Está abierto: tocá el pergamino para leerlo.'
-        : emptyNow() && status.status === 'vacio'
+        : emptyNow() && status.status !== 'abierto'
           ? 'Por ahora el cryptex no guarda nada.'
           : (d && d.hint) || 'Alineá las letras correctas y tirá de las tapas para abrirlo.';
     cx = window.Cryptex.mount($('cxHost'), {
@@ -321,6 +381,7 @@
       },
     });
     $('cxModal').classList.add('open');
+    document.querySelector('.room').inert = true; // detrás del cryptex no se alcanza nada
     cx.focus();
   }
 
@@ -344,7 +405,10 @@
   function closeCryptex(now = false) {
     const m = $('cxModal');
     if (!m.classList.contains('open') && !cx) return;
+    const had = m.contains(document.activeElement);
     m.classList.remove('open');
+    document.querySelector('.room').inert = false;
+    if (had && view === 'escritorio') $('cryptexObj').focus({ preventScroll: true });
     const old = cx;
     cx = null;
     activeId = null;
@@ -362,6 +426,9 @@
       desk.classList.add('hidden');
       body.classList.remove('vista-escena', 'vista-tablero', 'vista-escritorio');
       camara.style.transform = '';
+      $('board').style.translate = '';
+      $('boardView').inert = false;
+      area.inert = false;
       ['goBoard', 'backBtn', 'sceneHint'].forEach((id) => $(id).classList.add('hidden'));
       closeCryptex(true);
       view = null;

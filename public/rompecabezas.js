@@ -251,6 +251,7 @@
       p.el.style.left = (p.x - G.mxN) * 100 + '%';
       p.el.style.top = (p.y - G.myN) * 100 + '%';
       p.el.style.zIndex = p.ok ? 2 : p.z;
+      p.el.classList.toggle('rz-ok', p.ok); // en su lugar ya no se toca: deja pasar el dedo
       p.el.tabIndex = interactive && !p.ok && !done ? 0 : -1;
       p.el.setAttribute('aria-label', `Pieza ${p.i + 1} de ${N}` + (p.ok ? ', en su lugar' : ''));
     }
@@ -260,7 +261,7 @@
       const h = host.offsetHeight;
       if (!h) return 0;
       const eff = host.getBoundingClientRect().height / h; // si un ancestro lo agranda, más definición
-      return (h / S) * Math.min(3, (window.devicePixelRatio || 1) * Math.max(1, eff || 1));
+      return (h / S) * Math.min(2, (window.devicePixelRatio || 1) * Math.max(1, eff || 1));
     }
 
     function paint(p) {
@@ -351,6 +352,7 @@
         cover = { w: iw * s, h: ih * s, x: (G.tw - iw * s) / 2, y: (G.th - ih * s) / 2 };
         paintAll(true);
       };
+      im.onerror = () => { if (!destroyed && !img) paintAll(true); }; // sin imagen: piezas de cartón
       im.src = opts.image;
     }
 
@@ -478,15 +480,17 @@
     // Un clic en el borde transparente de una pieza (sin pieza debajo) es para lo que hay abajo
     // (el cryptex, un pergamino): se le pasa.
     root.addEventListener('click', (e) => {
+      if (panMoved) { panMoved = false; e.stopPropagation(); return; } // el clic de un desplazamiento no abre nada
       if (!byEl.has(e.target) || pieceAt(e.clientX, e.clientY)) return;
       const below = document.elementsFromPoint(e.clientX, e.clientY).find((el) => !root.contains(el) && el !== host);
       if (below && typeof below.click === 'function') { e.stopPropagation(); below.click(); }
     });
 
     root.addEventListener('pointerdown', (e) => {
+      panMoved = false; // si después de desplazar no llegó el clic, que no se coma el próximo
       if (!interactive || done || drag || e.button > 0 || !e.isPrimary) return;
       const p = pieceAt(e.clientX, e.clientY);
-      if (!p) return;
+      if (!p) { if (e.pointerType !== 'mouse') startPan(e); return; }
       e.preventDefault();
       if (teclado) soltarTeclado();
       if (p.anim) { p.anim.cancel(); p.anim = null; }
@@ -498,6 +502,40 @@
       root.classList.add('rz-moviendo');
       try { p.el.setPointerCapture(e.pointerId); } catch {}
     });
+
+    // Con el dedo, las piezas no dejan desplazar lo que las contiene (touch-action: none en todo
+    // el canvas, también en el borde transparente): si se apoya ahí, se desplaza a mano.
+    let pan = null, panMoved = false;
+    function scrollerOf(el) {
+      for (let n = el.parentElement; n && n !== document.body; n = n.parentElement) {
+        const cs = getComputedStyle(n);
+        const x = /auto|scroll/.test(cs.overflowX) && n.scrollWidth > n.clientWidth;
+        const y = /auto|scroll/.test(cs.overflowY) && n.scrollHeight > n.clientHeight;
+        if (x || y) return { n, x, y };
+      }
+      const d = document.scrollingElement;
+      return d ? { n: d, x: d.scrollWidth > d.clientWidth, y: d.scrollHeight > d.clientHeight } : null;
+    }
+    function startPan(e) {
+      const sc = scrollerOf(host);
+      if (!sc) return;
+      pan = { ...sc, el: e.target, id: e.pointerId, sx: e.clientX, sy: e.clientY, sl: sc.n.scrollLeft, st: sc.n.scrollTop };
+      panMoved = false;
+      try { e.target.setPointerCapture(e.pointerId); } catch {}
+    }
+    function movePan(e) {
+      if (!pan || e.pointerId !== pan.id) return;
+      const dx = e.clientX - pan.sx, dy = e.clientY - pan.sy;
+      if (!panMoved && Math.hypot(dx, dy) < 6) return;
+      panMoved = true;
+      if (pan.x) pan.n.scrollLeft = pan.sl - dx;
+      if (pan.y) pan.n.scrollTop = pan.st - dy;
+    }
+    function endPan(e) {
+      if (!pan || (e && e.pointerId !== pan.id)) return;
+      try { pan.el.releasePointerCapture(pan.id); } catch {}
+      pan = null;
+    }
 
     function moveDrag(e) {
       if (!drag || e.pointerId !== drag.id) return;
@@ -529,6 +567,7 @@
     }
 
     root.addEventListener('pointermove', (e) => {
+      if (pan) return movePan(e);
       if (drag) return moveDrag(e);
       if (e.pointerType !== 'mouse' || !interactive || done) return;
       // el cursor de "agarrar" solo sobre la forma de una pieza
@@ -542,9 +581,9 @@
       }
     });
     root.addEventListener('pointerleave', () => { hoverPt = null; root.classList.remove('rz-agarra'); });
-    root.addEventListener('pointerup', (e) => endDrag(e));
-    root.addEventListener('pointercancel', (e) => endDrag(e));
-    root.addEventListener('lostpointercapture', (e) => endDrag(e));
+    root.addEventListener('pointerup', (e) => { endPan(e); endDrag(e); });
+    root.addEventListener('pointercancel', (e) => { endPan(e); endDrag(e); });
+    root.addEventListener('lostpointercapture', (e) => { endPan(e); endDrag(e); });
     root.addEventListener('contextmenu', (e) => { if (byEl.has(e.target)) e.preventDefault(); });
 
     // Escape mientras se arrastra: vuelve a donde estaba (y no cierra la vista del escritorio)
@@ -619,7 +658,7 @@
     zTop = Math.max(...P.map((p) => p.z));
     root.classList.toggle('rz-quieto', !interactive);
     layoutStatic();
-    paintAll(true);
+    if (!opts.image) paintAll(true); // con imagen se pinta una sola vez, cuando llega
     loadImage();
     if (ro) ro.observe(host);
     checkDone(true);
