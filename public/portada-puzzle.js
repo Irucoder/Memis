@@ -92,6 +92,15 @@
       // el pincel, al ir y venir, se sale un poco de ese recuadro
       if (u) { const m = 14; out.push(polyOf(u[0] - m, u[1] - m, u[2] + m, u[3] + m)); }
     }
+    // el cryptex y la rosa (abajo, en las esquinas): marcan con data-ocupa el lugar que ocupan
+    // (apenas lo saben, aunque todavía se estén pintando; antes de eso, data-ocupa no tiene tamaño)
+    for (const capa of vecinas) {
+      if (!capa.isConnected || capa.classList.contains('oculto')) continue;
+      for (const o of capa.querySelectorAll('[data-ocupa]')) {
+        const b = rect(o);
+        if (b) out.push(polyOf(...b));
+      }
+    }
     return out;
   }
 
@@ -111,6 +120,20 @@
       { w: portrait.matches ? 0.96 : 0.6, at: (g) => [MARGEN, vh - MARGEN - CAJA.h * g] },          // abajo a la izquierda
       { w: portrait.matches ? 0.96 : 0.55, at: (g) => [vw - MARGEN - CAJA.w * g, vh - MARGEN - CAJA.h * g] }, // abajo a la derecha
     ];
+    if (portrait.matches) {
+      // abajo, entre el cryptex y la rosa: el hueco no siempre queda al medio (el borde de la
+      // carpeta baja en diagonal), así que se prueba a lo largo del borde, del medio a los costados
+      for (let k = 1; k <= 18; k++) {
+        const f = 0.5 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.05;
+        cands.push({ w: 0.99, at: (g) => [MARGEN + (vw - 2 * MARGEN - CAJA.w * g) * f, vh - MARGEN - CAJA.h * g] });
+      }
+      // y si abajo no hay lugar (ventanas casi cuadradas: la carpeta llega al borde de abajo y el
+      // rincón libre ya lo tiene el cryptex), a un costado de la carpeta, más arriba
+      for (let f = 0.1; f < 0.95; f += 0.1) {
+        cands.push({ w: 0.85, at: (g) => [MARGEN, vh - MARGEN - CAJA.h * g - (vh - 2 * MARGEN - CAJA.h * g) * f] });
+        cands.push({ w: 0.85, at: (g) => [vw - MARGEN - CAJA.w * g, vh - MARGEN - CAJA.h * g - (vh - 2 * MARGEN - CAJA.h * g) * f] });
+      }
+    }
     const entra = (cand, g) => {
       const [x, y] = cand.at(g), w = CAJA.w * g, h = CAJA.h * g;
       if (x < MARGEN - 0.5 || y < MARGEN - 0.5 || x + w > vw - MARGEN + 0.5 || y + h > vh - MARGEN + 0.5) return false;
@@ -125,13 +148,16 @@
       const score = lo * cand.w;
       if (!best || score > best.score + 1e-9) best = { score, g: lo, cand };
     }
-    // muy chiquito no tiene gracia (y no se podría tocar): mejor no mostrarlo
-    if (!best || CAJA.w * best.g < 120) { L = null; return L; }
+    // muy chiquito no tiene gracia (y no se podría tocar): mejor no mostrarlo. En el celular se le
+    // tiene más paciencia: abajo comparte el lugar con el cryptex y la rosa, y se lo mira de cerca
+    if (!best || CAJA.w * best.g < (portrait.matches ? 100 : 120)) { L = null; return L; }
     const g = best.g;
     const [x, y] = best.cand.at(g);
     L = { g, x, y };
     return L;
   }
+
+  const vecinas = ['cripto', 'rosa'].map((id) => document.getElementById(id)).filter(Boolean);
 
   // ---------- Elementos ----------
   const el = (tag, cls, attrs = {}) => { const e = document.createElement(tag); e.className = cls; Object.assign(e, attrs); return e; };
@@ -361,10 +387,15 @@
     onChange(mq, fn);
   };
   watchDpr();
-  // El tintero aparece (o se cae, si no carga) cuando termina de cargar: recién ahí se sabe qué
-  // lugar ocupa. Se lo espera un rato antes de mostrar el rompecabezas, para que no salte de lugar.
+  // El tintero, el cryptex y la rosa aparecen (o se caen, si no cargan) cuando terminan de cargar:
+  // recién ahí se sabe qué lugar ocupan. Se los espera un rato antes de mostrar el rompecabezas,
+  // para que no salte de lugar. Del cryptex y la rosa alcanza con que sepan dónde van (data-ocupa
+  // ya ubicado): pintarse les lleva un rato más. Una capa vacía es que su script no llegó a correr
+  // (no cargó): no se la espera (cuando se empieza, después del load, ya corrieron todos)
   const tinta = document.getElementById('tinta');
-  const tintaLista = () => !tinta || !tinta.isConnected || !tinta.classList.contains('cargando');
+  const otras = [tinta, ...vecinas].filter(Boolean);
+  const ubicada = (c) => vecinas.includes(c) && [...c.querySelectorAll('[data-ocupa]')].some((o) => rect(o));
+  const tintaLista = () => otras.every((c) => !c.isConnected || !c.firstElementChild || !c.classList.contains('cargando') || ubicada(c));
   let esperando = false;
   function mostrar() {
     esperando = false;
@@ -372,10 +403,13 @@
     layer.classList.remove('cargando');
   }
   const alCambiarTinta = () => { if (esperando) { if (tintaLista()) mostrar(); } else relayout(); };
-  if (tinta) {
-    new MutationObserver(alCambiarTinta).observe(tinta, { attributes: true, attributeFilter: ['class'] });
-    if (tinta.parentNode) new MutationObserver(() => { if (!tinta.isConnected) alCambiarTinta(); }).observe(tinta.parentNode, { childList: true });
-  }
+  const mira = new MutationObserver(alCambiarTinta);
+  for (const c of otras) mira.observe(c, { attributes: true, attributeFilter: ['class'] });
+  // y cuando el cryptex o la rosa se ubican (o se mueven) mientras se pintan, que no avisan con la clase
+  const mirarOcupa = () => {
+    for (const c of vecinas) for (const o of c.querySelectorAll('[data-ocupa]')) mira.observe(o, { attributes: true, attributeFilter: ['style'] });
+  };
+  if (document.body) new MutationObserver(() => { if (otras.some((c) => !c.isConnected)) alCambiarTinta(); }).observe(document.body, { childList: true });
 
   // ---------- Carga (después de la portada, para no demorarla) ----------
   const load = (name) => new Promise((ok, fail) => {
@@ -386,6 +420,7 @@
     im.src = '/portada-puzzle/' + name + '.webp';
   });
   function start() {
+    mirarOcupa(); // (sus scripts van después de este: recién ahora están)
     Promise.all([load('piezas'), load('brillo')]).then(([pz, br]) => {
       sprite = pz; brillo = br;
       if (tintaLista()) { mostrar(); return; }

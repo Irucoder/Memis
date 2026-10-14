@@ -9,7 +9,7 @@
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Josefin+Sans:wght@600&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="/fondo.webp">
   <style>
     html, body {
@@ -171,6 +171,69 @@
     .p-boton:focus { outline: none; }
     .p-boton:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.55); outline-offset: 2px; }
 
+    /* Cryptex (portada-cryptex.js): abajo a la izquierda; al tocarlo, los anillos dicen MEMITO */
+    .cripto {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      overflow: hidden;
+      overflow: clip;
+      pointer-events: none;
+    }
+    .cripto.cargando, .cripto.oculto { visibility: hidden; }
+    .c-lienzo, .c-boton { position: absolute; left: 0; top: 0; }
+    .c-lienzo { transform-origin: 0 0; }
+    .c-boton { /* va girado como el cryptex: se toca el cilindro, no el paño */
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 9% / 34%;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      transform-origin: 50% 50%;
+    }
+    .cripto.girando .c-boton { cursor: default; }
+    .c-boton:focus { outline: none; }
+    .c-boton:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.55); outline-offset: 3px; }
+    /* (fin del cryptex) */
+
+    /* Rosa blanca (portada-rosa.js): abajo a la derecha; al tocarla se mueven los pétalos */
+    .rosa {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      overflow: hidden;
+      overflow: clip;
+      pointer-events: none;
+    }
+    .rosa.cargando, .rosa.oculto { visibility: hidden; }
+    .r-lienzo, .r-ocupa, .r-boton { position: absolute; left: 0; top: 0; }
+    .r-lienzo { transform-origin: 0 0; }
+    .r-ocupa { pointer-events: none; }
+    .r-boton { /* redondo: solo la flor */
+      margin: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      cursor: pointer;
+      pointer-events: auto;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .r-boton:focus { outline: none; }
+    .r-boton:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.55); outline-offset: 2px; }
+    /* mientras se pinta por primera vez (si apareció después), ni se ve ni se toca */
+    .rosa.horneando .r-lienzo { opacity: 0; }
+    .rosa.horneando .r-boton { pointer-events: none; }
+    @media (prefers-reduced-motion: no-preference) {
+      .r-lienzo { transition: opacity 0.3s ease-out; }
+    }
+    /* (fin de la rosa) */
+
     .sr-only {
       position: absolute; width: 1px; height: 1px; overflow: hidden;
       clip: rect(0 0 0 0); white-space: nowrap;
@@ -194,10 +257,14 @@
   </main>
   <div class="tinta cargando" id="tinta"></div>
   <div class="puzzle cargando" id="puzzle"></div>
+  <div class="cripto cargando" id="cripto"></div>
+  <div class="rosa cargando" id="rosa"></div>
 
   <script src="/auth.js"></script>
   <script src="/tinta.js" defer></script>
   <script src="/portada-puzzle.js" defer></script>
+  <script src="/portada-cryptex.js" defer></script>
+  <script src="/portada-rosa.js" defer></script>
   <script>
     const form = document.getElementById('login');
     const input = document.getElementById('password');
@@ -210,8 +277,8 @@
     document.addEventListener('mousedown', (e) => {
       if (e.target === input) return;
       e.preventDefault(); // que el click no le saque el foco a la casilla
-      // el pincel y el rompecabezas no: en el celular abriría el teclado y los taparía
-      if (e.target.closest && e.target.closest('.t-boton, .p-boton')) return;
+      // el pincel, el rompecabezas, el cryptex y la rosa no: en el celular abriría el teclado y los taparía
+      if (e.target.closest && e.target.closest('.t-boton, .p-boton, .c-boton, .r-boton')) return;
       input.focus();
     });
 
